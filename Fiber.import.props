@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="UserMacros">
+    <FiberBasePath>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory).'))\</FiberBasePath>
+    <FiberIncludePath>$(FiberBasePath)code\source\api\</FiberIncludePath>
+
+    <FiberLibName Condition="'$(Configuration)'=='Debug'">$(MSBuildProjectName)_d</FiberLibName>
+    <FiberLibName Condition="'$(Configuration)'=='Release'">$(MSBuildProjectName)</FiberLibName>
+
+    <FiberImported>true</FiberImported>
+  </PropertyGroup> 
+  
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(FiberIncludePath);%(AdditionalIncludeDirectories
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(FiberBasePath)code\Fiber.vcxproj">
+      <Project>{6F360A04-03AB-4263-83E1-EABE696A4445}</Project>
+    </ProjectReference>
+  </ItemGroup>
+</Project>

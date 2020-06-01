@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="API">
+      <UniqueIdentifier>{680c93de-2c62-41a2-a5d5-47060762d0b6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="source\api\Fiber\fiber.h">
+      <Filter>API</Filter>
+    </ClInclude>
+    <ClInclude Include="coro.h" />
+    <ClInclude Include="source\platform.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="source\api\fiber.cpp" />
+    <ClCompile Include="coro.cpp" />
+  </ItemGroup>
+</Project>
