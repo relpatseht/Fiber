@@ -1,14 +1,18 @@
 #pragma once
 
+#include <cstdint>
+
 namespace fiber
 {
 	struct Fiber
 	{
-		void** sp;
+		uintptr_t* sp;
+		uintptr_t* stackHead;
 	};
 
 	typedef void(*FiberFunc)(void*);
 
 	Fiber Create(void *stack, unsigned stackSize, FiberFunc startAddress, void* userData);
-	void Switch(const Fiber &curFiber, Fiber* toFiber);
+	void Start(Fiber* toFiber);
+	void Switch(Fiber *curFiber, Fiber* toFiber);
 }

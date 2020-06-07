@@ -12,7 +12,7 @@
   
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(FiberIncludePath);%(AdditionalIncludeDirectories
+      <AdditionalIncludeDirectories>$(FiberIncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
 

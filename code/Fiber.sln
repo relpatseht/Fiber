@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.29424.173
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Fiber", "Fiber.vcxproj", "{6F360A04-03AB-4263-83E1-EABE696A4445}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Test", "Test.vcxproj", "{75FF3485-FBE4-4515-B15B-57D6B2783E99}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -15,6 +17,10 @@ Global
 		{6F360A04-03AB-4263-83E1-EABE696A4445}.Debug|x64.Build.0 = Debug|x64
 		{6F360A04-03AB-4263-83E1-EABE696A4445}.Release|x64.ActiveCfg = Release|x64
 		{6F360A04-03AB-4263-83E1-EABE696A4445}.Release|x64.Build.0 = Release|x64
+		{75FF3485-FBE4-4515-B15B-57D6B2783E99}.Debug|x64.ActiveCfg = Debug|x64
+		{75FF3485-FBE4-4515-B15B-57D6B2783E99}.Debug|x64.Build.0 = Debug|x64
+		{75FF3485-FBE4-4515-B15B-57D6B2783E99}.Release|x64.ActiveCfg = Release|x64
+		{75FF3485-FBE4-4515-B15B-57D6B2783E99}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

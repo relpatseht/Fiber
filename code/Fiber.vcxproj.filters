@@ -9,11 +9,12 @@
     <ClInclude Include="source\api\Fiber\fiber.h">
       <Filter>API</Filter>
     </ClInclude>
-    <ClInclude Include="coro.h" />
     <ClInclude Include="source\platform.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="source\api\fiber.cpp" />
-    <ClCompile Include="coro.cpp" />
+    <ClCompile Include="source\fiber.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="source\win64_fiber.asm" />
   </ItemGroup>
 </Project>
