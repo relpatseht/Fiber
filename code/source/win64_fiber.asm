@@ -6,7 +6,6 @@ _TEXT SEGMENT
 
 PUBLIC StartASM
 PUBLIC SwitchFiberASM
-PUBLIC GetShutdownAddrASM
 PUBLIC GetStartupAddrASM
 
 StoreContext:
@@ -70,12 +69,7 @@ LoadContext:
 	pop QWORD PTR gs:[00h]
 
 	ret
-
-GetShutdownAddrASM PROC
-	lea rax, EndFiber
-	ret
-GetShutdownAddrASM ENDP
-
+	
 GetStartupAddrASM PROC
 	lea rax, StartFiber
 	ret
@@ -90,42 +84,7 @@ SwitchFiberASM PROC
 	jmp LoadContext
 SwitchFiberASM ENDP
 
-InitRegDebug PROC
-	mov eax,  06060606h
-	vpbroadcastd xmm6, eax
-	mov eax,  07070707h
-	vpbroadcastd xmm7, eax
-	mov eax,  08080808h
-	vpbroadcastd xmm8, eax
-	mov eax,  09090909h
-	vpbroadcastd xmm9, eax
-	mov eax,  10101010h
-	vpbroadcastd xmm10, eax
-	mov eax,  11111111h
-	vpbroadcastd xmm11, eax
-	mov eax,  12121212h
-	vpbroadcastd xmm12, eax
-	mov eax,  13131313h
-	vpbroadcastd xmm13, eax
-	mov eax,  14141414h
-	vpbroadcastd xmm14, eax
-	mov eax,  15151515h
-	vpbroadcastd xmm15, eax
-	mov rsi, 05151515151515151h
-	mov rdi, 0D1D1D1D1D1D1D1D1h
-	mov rbp, 0B9B9B9B9B9B9B9B9h
-	mov rbx, 0BBBBBBBBBBBBBBBBh
-	mov r12, 01212121212121212h
-	mov r13, 01313131313131313h
-	mov r14, 01414141414141414h
-	mov r15, 01515151515151515h
-
-	ret
-InitRegDebug ENDP
-
 StartASM PROC
-	;call InitRegDebug
-
 	call StoreContext
 
 	mov [rcx+140h], rsp ; Put current stack in initial fiber state
