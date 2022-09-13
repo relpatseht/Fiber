@@ -2,6 +2,7 @@
 # define WIN32_LEAN_AND_MEAN
 # define NOMINMAX
 # include <Windows.h>
+#include <xmmintrin.h>
 #elif defined(__linux__) //#if defined(_WIN32)
 # include <sys/mman.h>
 # include <setjmp.h>
@@ -27,6 +28,7 @@ extern "C"
 namespace
 {
 	static constexpr uintptr_t START_STACK_PLACEHOLDER = 0xBAADF00D;
+
 }
 
 namespace fiber
