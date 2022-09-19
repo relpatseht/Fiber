@@ -20,33 +20,15 @@
 
 #define sanity(X) do{ if(!(X)) __debugbreak(); }while(0)
 
-namespace
-{
-	static constexpr uintptr_t END_GUARD = 0xDEADDEADDEADDEADull;
-
-	static void Validate(const fiber::Fiber& f)
-	{
-#if USING(VALIDATE_FIBERS)
-		sanity(*f.stackCeil == END_GUARD && "Stack overrun detected.");
-		sanity(f.sp >= f.stackCeil && "Stack overrun detected.");
-		sanity(f.sp < f.stackHead && "Stack underrun detected.");
-#else //#if USING(VALIDATE_FIBERS)
-		((void)f);
-#endif //#else //#if USING(VALIDATE_FIBERS)
-	}
-}
-
 namespace fiber
 {
 	Fiber Create(void* stack, unsigned stackSize, FiberFunc startAddress, void* userData)
 	{
 		uintptr_t* const stackCeil = reinterpret_cast<uintptr_t*>(stack);
 		uintptr_t* const stackBase = stackCeil + (stackSize / sizeof(uintptr_t));
-		Fiber out{ stackBase, stackCeil, stackBase };
+		Fiber out{ stackBase, stackCeil };
 
-		*stackCeil = END_GUARD;
 		out.sp = InitStackRegisters(stackBase, startAddress, userData, stackSize);
-		Validate(out);
 
 		return out;								   
 	}
@@ -55,21 +37,13 @@ namespace fiber
 	{
 		sanity(toFiber->stackHead[-1] == GetStackStartPlaceholder());
 
-		Validate(*toFiber);
 		StartASM(toFiber->sp);
-		Validate(*toFiber);
 	}
 
 	void Switch(Fiber* curFiber, Fiber* toFiber)
 	{
 		toFiber->stackHead[-1] = curFiber->stackHead[-1]; // copy around the return stack frame pointer
 
-		Validate(*curFiber);
-		Validate(*toFiber);
-
 		SwitchFiberASM(curFiber, toFiber);
-
-		Validate(*toFiber);
-		Validate(*curFiber);
 	}
 }

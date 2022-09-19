@@ -7,7 +7,6 @@ namespace fiber
 	struct Fiber
 	{
 		uintptr_t* sp;
-		uintptr_t* stackCeil;
 		uintptr_t* stackHead;
 	};
 
