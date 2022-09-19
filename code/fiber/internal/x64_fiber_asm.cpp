@@ -207,14 +207,6 @@ uintptr_t* InitStackRegisters(uintptr_t* sp, void(*StartAddress)(void*), void* u
 
 	sp -= CPU_REG_COUNT;
 	memset(sp, 0, CPU_REG_COUNT * sizeof(*sp));
-	for (unsigned r = 1; r <= CPU_REG_COUNT; ++r)
-	{
-		uint8_t* const bsp = reinterpret_cast<uint8_t*>(sp + CPU_REG_COUNT - r);
-		for (unsigned b = 0; b < CPU_REG_WIDTH; ++b)
-		{
-			bsp[b] = r;
-		}
-	}
 
 	size_t fpuEntries = MOV_SIZE_ALIGNED / sizeof(*sp);
 #if USING(SAVE_FPU_CONTROL)
@@ -224,15 +216,6 @@ uintptr_t* InitStackRegisters(uintptr_t* sp, void(*StartAddress)(void*), void* u
 
 	sp -= fpuEntries;
 	memset(sp, 0, fpuEntries * sizeof(*sp));
-
-	for (unsigned r = 1; r <= FPU_REG_COUNT; ++r)
-	{
-		uint8_t* const bsp = reinterpret_cast<uint8_t*>(sp + FPU_REG_COUNT*2 - r*2 + 1);
-		for (unsigned b = 0; b < FPU_REG_WIDTH; ++b)
-		{
-			bsp[b] = r + CPU_REG_COUNT;
-		}
-	}
 
 	return sp;
 }
