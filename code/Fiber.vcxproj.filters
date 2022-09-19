@@ -10,7 +10,6 @@
       <Filter>API</Filter>
     </ClInclude>
     <ClInclude Include="fiber\internal\platform.h" />
-    <ClInclude Include="fiber\internal\context.h" />
     <ClInclude Include="fiber\internal\platform_api.h" />
     <ClInclude Include="fiber\internal\features.h" />
     <ClInclude Include="shared\usings.h" />
