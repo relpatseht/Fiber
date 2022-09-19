@@ -10,9 +10,15 @@
       <Filter>API</Filter>
     </ClInclude>
     <ClInclude Include="source\platform.h" />
+    <ClInclude Include="source\context.h" />
+    <ClInclude Include="source\platform_api.h" />
+    <ClInclude Include="source\features.h" />
+    <ClInclude Include="source\usings.h" />
+    <ClInclude Include="source\concat_arrays.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\fiber.cpp" />
+    <ClCompile Include="source\x64_fiber_asm.cpp" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="source\win64_fiber.asm" />

@@ -14,20 +14,13 @@
 #endif //#else //#elif defined(__linux__) //#if defined(_WIN32)
 #include <cstring>
 #include "platform.h"
+#include "platform_api.h"
 #include "Fiber/fiber.h"
 
 #define sanity(X) do{ if(!(X)) __debugbreak(); }while(0)
 
-extern "C"
-{
-	void StartASM(void* fiberSP);
-	void SwitchFiberASM(void* curFiber, void* toFiber);
-	uintptr_t GetStartupAddrASM();
-}
-
 namespace
 {
-	static constexpr uintptr_t START_STACK_PLACEHOLDER = 0xBAADF00D;
 
 }
 
@@ -35,37 +28,19 @@ namespace fiber
 {
 	Fiber Create(void* stack, unsigned stackSize, FiberFunc startAddress, void* userData)
 	{
+		static constexpr unsigned CONTEXT_REG_COUNT = EXTRA_QWORD_COUNT + BASE_REG_COUNT + XMM_REG_COUNT * 2;
 		uintptr_t* const stackCeil = reinterpret_cast<uintptr_t*>(stack);
 		uintptr_t* const stackBase = stackCeil + (stackSize / sizeof(uintptr_t));
 		Fiber out{ stackBase, stackBase };
 
-		*--out.sp = START_STACK_PLACEHOLDER; // placeholder for original stack set in Start
-
-#if defined(_WIN32)
-		out.sp -= 4; // argument shadow space + alignment
-#endif //#if defined(_WIN32)
-
-		* --out.sp; // Holding for the return function address
-		*--out.sp = reinterpret_cast<uintptr_t>(startAddress);
-		*--out.sp = reinterpret_cast<uintptr_t>(userData);
-		*--out.sp = GetStartupAddrASM();
-		unsigned registersToInit = CONTEXT_REG_COUNT;
-#if defined(_WIN32)
-		// Win32 has the TIB to init
-		*--out.sp = 0; // gs::0x0, structured exception handling frame
-		*--out.sp = reinterpret_cast<uintptr_t>(stackBase); // gs:0x8, stack base (high address)
-		*--out.sp = reinterpret_cast<uintptr_t>(stackCeil); // gs:0x10, stack ceiling (low address)
-		registersToInit -= 3;
-#endif //#if defined(_WIN32)
-		out.sp -= registersToInit;
-		std::memset(out.sp, 0, registersToInit * sizeof(*out.sp));
+		out.sp = InitStackRegisters(stackBase, startAddress, userData, stackSize);
 
 		return out;								   
 	}
 
 	void Start(Fiber* toFiber)
 	{
-		sanity(toFiber->stackHead[-1] == START_STACK_PLACEHOLDER);
+		sanity(toFiber->stackHead[-1] == GetStackStartPlaceholder());
 
 		StartASM(toFiber->sp);
 	}

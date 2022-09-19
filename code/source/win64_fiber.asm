@@ -13,6 +13,8 @@ StoreContext:
 	push QWORD PTR gs:[00h]
 	push QWORD PTR gs:[08h]
 	push QWORD PTR gs:[10h]
+	push QWORD PTR gs:[1478h]
+	push QWORD PTR gs:[1748h]
 	push rsi
 	push rdi
 	push rbp
@@ -21,7 +23,7 @@ StoreContext:
 	push r13
 	push r14
 	push r15
-	sub rsp, 168 ; for xmm6-xmm15
+	sub rsp, 168; for xmm6-xmm15
 	movaps [rsp+98h], xmm6
 	movaps [rsp+88h], xmm7
 	movaps [rsp+78h], xmm8
@@ -32,8 +34,28 @@ StoreContext:
 	movaps [rsp+28h], xmm13
 	movaps [rsp+18h], xmm14
 	movaps [rsp+08h], xmm15
+	stmxcsr [rsp]
 
 	jmp rax ; return
+
+	
+StartASM PROC
+	call StoreContext
+
+	mov [rcx+140h], rsp ; Put current stack in initial fiber state
+	mov rsp, rcx        ; Switch out to new stackframe
+
+	jmp LoadContext
+StartASM ENDP
+
+SwitchFiberASM PROC
+	call StoreContext
+
+	mov [rcx], rsp ; Store the current stackframe
+	mov rsp, [rdx] ; Switch to the new stackframe
+
+	jmp LoadContext
+SwitchFiberASM ENDP
 
 StartFiber:
 	pop rcx  ; Startup userdata
@@ -45,6 +67,7 @@ EndFiber:
 	pop rsp
 
 LoadContext:
+	ldmxcsr [rsp]
 	movaps xmm15, [rsp+08h] 
 	movaps xmm14, [rsp+18h] 
 	movaps xmm13, [rsp+28h] 
@@ -64,34 +87,20 @@ LoadContext:
 	pop rbp
 	pop rdi
 	pop rsi
+	pop QWORD PTR gs:[1748h]
+	pop QWORD PTR gs:[1478h]
 	pop QWORD PTR gs:[10h]
 	pop QWORD PTR gs:[08h]
+
 	pop QWORD PTR gs:[00h]
 
 	ret
-	
+
 GetStartupAddrASM PROC
 	lea rax, StartFiber
 	ret
 GetStartupAddrASM ENDP
 
-SwitchFiberASM PROC
-	call StoreContext
-
-	mov [rcx], rsp ; Store the current stackframe
-	mov rsp, [rdx] ; Switch to the new stackframe
-
-	jmp LoadContext
-SwitchFiberASM ENDP
-
-StartASM PROC
-	call StoreContext
-
-	mov [rcx+140h], rsp ; Put current stack in initial fiber state
-	mov rsp, rcx        ; Switch out to new stackframe
-
-	jmp LoadContext
-StartASM ENDP
 _TEXT ENDS
 
 END
