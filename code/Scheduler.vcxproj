@@ -72,6 +72,11 @@
   </PropertyGroup>
   <ItemGroup>
     <ClInclude Include="scheduler\scheduler\scheduler.h" />
+    <ClInclude Include="scheduler\scheduler\task.h" />
+    <ClInclude Include="scheduler\scheduler\thread.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="scheduler\scheduler\scheduler.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

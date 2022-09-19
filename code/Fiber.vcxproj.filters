@@ -4,16 +4,24 @@
     <Filter Include="API">
       <UniqueIdentifier>{680c93de-2c62-41a2-a5d5-47060762d0b6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="shared">
+      <UniqueIdentifier>{31cac73b-f22d-49c0-a29f-0181d16ff015}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="fiber\fiber\fiber.h">
       <Filter>API</Filter>
     </ClInclude>
-    <ClInclude Include="fiber\internal\platform.h" />
     <ClInclude Include="fiber\internal\platform_api.h" />
     <ClInclude Include="fiber\internal\features.h" />
-    <ClInclude Include="shared\usings.h" />
     <ClInclude Include="fiber\internal\concat_arrays.h" />
+    <ClInclude Include="fiber\internal\register_definitions.h" />
+    <ClInclude Include="shared\usings.h">
+      <Filter>shared</Filter>
+    </ClInclude>
+    <ClInclude Include="shared\platform.h">
+      <Filter>shared</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="fiber\internal\fiber.cpp" />

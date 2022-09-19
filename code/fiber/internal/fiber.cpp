@@ -40,7 +40,6 @@ namespace fiber
 {
 	Fiber Create(void* stack, unsigned stackSize, FiberFunc startAddress, void* userData)
 	{
-		static constexpr unsigned CONTEXT_REG_COUNT = EXTRA_QWORD_COUNT + BASE_REG_COUNT + XMM_REG_COUNT * 2;
 		uintptr_t* const stackCeil = reinterpret_cast<uintptr_t*>(stack);
 		uintptr_t* const stackBase = stackCeil + (stackSize / sizeof(uintptr_t));
 		Fiber out{ stackBase, stackCeil, stackBase };

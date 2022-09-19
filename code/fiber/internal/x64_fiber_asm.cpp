@@ -1,5 +1,6 @@
 #include "platform.h"
 #include "platform_api.h"
+#include "register_definitions.h"
 #include "features.h"
 #include "concat_arrays.h"
 #include <cstdint>

@@ -73,8 +73,9 @@
     <ClInclude Include="fiber\fiber\fiber.h" />
     <ClInclude Include="fiber\internal\concat_arrays.h" />
     <ClInclude Include="fiber\internal\features.h" />
-    <ClInclude Include="fiber\internal\platform.h" />
     <ClInclude Include="fiber\internal\platform_api.h" />
+    <ClInclude Include="fiber\internal\register_definitions.h" />
+    <ClInclude Include="shared\platform.h" />
     <ClInclude Include="shared\usings.h" />
   </ItemGroup>
   <ItemGroup>

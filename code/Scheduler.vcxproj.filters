@@ -9,5 +9,14 @@
     <ClInclude Include="scheduler\scheduler\scheduler.h">
       <Filter>API</Filter>
     </ClInclude>
+    <ClInclude Include="scheduler\scheduler\thread.h">
+      <Filter>API</Filter>
+    </ClInclude>
+    <ClInclude Include="scheduler\scheduler\task.h">
+      <Filter>API</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="scheduler\scheduler\scheduler.cpp" />
   </ItemGroup>
 </Project>
