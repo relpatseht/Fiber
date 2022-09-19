@@ -49,7 +49,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>ZLIB_CONST;_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)source/api</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)shared</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -62,7 +62,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>ZLIB_CONST;_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)source/api</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)shared</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -70,25 +70,21 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="source\api\Fiber\fiber.h" />
-    <ClInclude Include="source\concat_arrays.h" />
-    <ClInclude Include="source\context.h" />
-    <ClInclude Include="source\features.h" />
-    <ClInclude Include="source\platform.h" />
-    <ClInclude Include="source\platform_api.h" />
-    <ClInclude Include="source\usings.h" />
+    <ClInclude Include="fiber\fiber\fiber.h" />
+    <ClInclude Include="fiber\internal\concat_arrays.h" />
+    <ClInclude Include="fiber\internal\context.h" />
+    <ClInclude Include="fiber\internal\features.h" />
+    <ClInclude Include="fiber\internal\platform.h" />
+    <ClInclude Include="fiber\internal\platform_api.h" />
+    <ClInclude Include="shared\usings.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="source\fiber.cpp" />
-    <ClCompile Include="source\x64_fiber_asm.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="fiber\internal\fiber.cpp" />
+    <ClCompile Include="fiber\internal\x64_fiber_asm.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="source\win64_fiber.asm">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    <MASM Include="fiber\internal\win64_fiber.asm">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
     </MASM>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

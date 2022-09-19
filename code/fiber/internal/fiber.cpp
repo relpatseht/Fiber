@@ -15,7 +15,7 @@
 #include <cstring>
 #include "platform.h"
 #include "platform_api.h"
-#include "Fiber/fiber.h"
+#include "../fiber/fiber.h"
 
 #define sanity(X) do{ if(!(X)) __debugbreak(); }while(0)
 

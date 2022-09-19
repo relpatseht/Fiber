@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.29424.173
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Fiber", "Fiber.vcxproj", "{6F360A04-03AB-4263-83E1-EABE696A4445}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Test", "Test.vcxproj", "{75FF3485-FBE4-4515-B15B-57D6B2783E99}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Fiber_Test", "Fiber_Test.vcxproj", "{75FF3485-FBE4-4515-B15B-57D6B2783E99}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
