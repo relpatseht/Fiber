@@ -4,6 +4,9 @@
     <Filter Include="API">
       <UniqueIdentifier>{9d0a1e79-58b4-4288-9530-53bb19685bff}</UniqueIdentifier>
     </Filter>
+    <Filter Include="shared">
+      <UniqueIdentifier>{3e9828a9-55ed-451d-a292-c281ea97e468}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="scheduler\scheduler\scheduler.h">
@@ -14,6 +17,12 @@
     </ClInclude>
     <ClInclude Include="scheduler\scheduler\task.h">
       <Filter>API</Filter>
+    </ClInclude>
+    <ClInclude Include="shared\platform.h">
+      <Filter>shared</Filter>
+    </ClInclude>
+    <ClInclude Include="shared\usings.h">
+      <Filter>shared</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
