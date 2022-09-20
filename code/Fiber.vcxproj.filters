@@ -12,8 +12,6 @@
     <ClInclude Include="fiber\fiber\fiber.h">
       <Filter>API</Filter>
     </ClInclude>
-    <ClInclude Include="fiber\internal\platform_api.h" />
-    <ClInclude Include="fiber\internal\features.h" />
     <ClInclude Include="fiber\internal\concat_arrays.h" />
     <ClInclude Include="fiber\internal\register_definitions.h" />
     <ClInclude Include="shared\usings.h">
@@ -25,9 +23,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="fiber\internal\fiber.cpp" />
-    <ClCompile Include="fiber\internal\x64_fiber_asm.cpp" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="fiber\internal\win64_fiber.asm" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="fiber\internal\x64_fiber_bytecode.inl" />
   </ItemGroup>
 </Project>
