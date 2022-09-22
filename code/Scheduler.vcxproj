@@ -34,6 +34,7 @@
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
   <ImportGroup Label="Shared">
+    <Import Project="$([MSBuild]::GetPathOfFileAbove(Fiber.import.props))" Condition="$(FiberImported) == ''" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -71,6 +72,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="scheduler\internal\spsc_unbounded_queue.h" />
     <ClInclude Include="scheduler\scheduler\scheduler.h" />
     <ClInclude Include="scheduler\scheduler\task.h" />
     <ClInclude Include="scheduler\scheduler\thread.h" />
@@ -78,7 +80,7 @@
     <ClInclude Include="shared\usings.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="scheduler\scheduler\scheduler.cpp" />
+    <ClCompile Include="scheduler\internal\scheduler.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
