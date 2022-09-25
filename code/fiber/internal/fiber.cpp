@@ -94,6 +94,16 @@ namespace
 
 #undef TO_BYTES
 
+	static uintptr_t* ToStackHead(fiber::Fiber* fiber)
+	{
+		static constexpr size_t ALIGN_STACK_ENTRIES = STACK_ALIGN / sizeof(uintptr_t);
+		static constexpr size_t FIBER_STACK_ENTRIES = (sizeof(fiber::Fiber) + (sizeof(uintptr_t)-1)) / sizeof(uintptr_t);
+
+		static_assert((STACK_ALIGN % sizeof(uintptr_t)) == 0);
+
+		return reinterpret_cast<uintptr_t*>(fiber) - (ALIGN_STACK_ENTRIES - FIBER_STACK_ENTRIES);
+	}
+
 	template<fiber::Options Opts>
 	struct FiberAPIImpl
 	{
@@ -107,9 +117,10 @@ namespace
 			const size_t stackMemEntries = alignedStackMemSize / sizeof(uintptr_t);
 			const size_t stackEntries = stackMemEntries - (STACK_ALIGN/sizeof(uintptr_t));
 			uintptr_t* const stackBase = stackCeil + stackEntries;
-			fiber::Fiber* out = reinterpret_cast<fiber::Fiber*>(stackMemEntries);
+			fiber::Fiber* out = reinterpret_cast<fiber::Fiber*>(stackCeil + stackMemEntries - sizeof(fiber::Fiber)/sizeof(uintptr_t));
 
 			static_assert(sizeof(fiber::Fiber) <= STACK_ALIGN);
+			sanity(stackBase == ToStackHead(out));
 
 			out->sp = FiberASMAPI<Opts>::InitStackRegisters(stackBase, startAddress, userData, stackEntries*sizeof(uintptr_t));
 
@@ -118,7 +129,7 @@ namespace
 
 		static void Start(fiber::Fiber* toFiber)
 		{
-			const uintptr_t* const stackHead = reinterpret_cast<uintptr_t*>(toFiber) + (STACK_ALIGN / sizeof(uintptr_t));
+			const uintptr_t* const stackHead = ToStackHead(toFiber);
 
 			sanity(stackHead[-1] == GetStackStartPlaceholder());
 
@@ -127,8 +138,8 @@ namespace
 
 		static void Switch(fiber::Fiber* curFiber, fiber::Fiber* toFiber)
 		{
-			uintptr_t* const toStackHead = reinterpret_cast<uintptr_t*>(toFiber) + (STACK_ALIGN / sizeof(uintptr_t));
-			const uintptr_t* const curStackHead = reinterpret_cast<uintptr_t*>(curFiber) + (STACK_ALIGN / sizeof(uintptr_t));
+			uintptr_t* const toStackHead = ToStackHead(toFiber);
+			const uintptr_t* const curStackHead = ToStackHead(curFiber);
 
 			toStackHead[-1] = curStackHead[-1]; // copy around the return stack frame pointer
 
