@@ -16,6 +16,11 @@ namespace fiber
 		return static_cast<Options>(static_cast<unsigned>(a) | static_cast<unsigned>(b));
 	}
 
+	constexpr Options& operator|=(Options& a, Options b)
+	{
+		return reinterpret_cast<Options&>(reinterpret_cast<unsigned&>(a) |= static_cast<unsigned>(b));
+	}
+
 	struct Fiber;
 
 	typedef void(*FiberFunc)(void*);

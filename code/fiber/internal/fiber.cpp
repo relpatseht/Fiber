@@ -121,8 +121,11 @@ namespace
 
 			static_assert(sizeof(fiber::Fiber) <= STACK_ALIGN);
 			sanity(stackBase == ToStackHead(out));
+			sanity(stackSize);
 
 			out->sp = FiberASMAPI<Opts>::InitStackRegisters(stackBase, startAddress, userData, stackEntries*sizeof(uintptr_t));
+
+			sanity(out->sp >= stackCeil, "Not enough stack space to hold base context");
 
 			return out;
 		}
