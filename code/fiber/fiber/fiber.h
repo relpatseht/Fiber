@@ -16,17 +16,13 @@ namespace fiber
 		return static_cast<Options>(static_cast<unsigned>(a) | static_cast<unsigned>(b));
 	}
 
-	struct Fiber
-	{
-		uintptr_t* sp;
-		uintptr_t* stackHead;
-	};
+	struct Fiber;
 
 	typedef void(*FiberFunc)(void*);
 
 	struct FiberAPI
 	{
-		Fiber(*Create)(void* stack, size_t stackSize, FiberFunc StartAddress, void* userData);
+		Fiber* (*Create)(void* stack, size_t stackSize, FiberFunc StartAddress, void* userData);
 		void (*Start)(Fiber* toFiber);
 		void (*Switch)(Fiber* curFiber, Fiber* toFiber);
 	};

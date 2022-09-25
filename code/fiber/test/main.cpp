@@ -9,7 +9,7 @@ fiber::FiberAPI s_fiberAPI;
 struct FiberData
 {
 	unsigned numFibers;
-	fiber::Fiber* fibers;
+	fiber::Fiber** fibers;
 	unsigned value;
 };
 
@@ -18,9 +18,9 @@ static void Func1(void* dataPtr)
 	const FiberData* const data = reinterpret_cast<FiberData*>(dataPtr);
 
 	printf("In func1 with fiberIndex %u\n", data->value);
-	s_fiberAPI.Switch(&data->fibers[0], &data->fibers[1]);
+	s_fiberAPI.Switch(data->fibers[0], data->fibers[1]);
 	printf("In func1 with fiberIndex %u\n", data->value);
-	s_fiberAPI.Switch(&data->fibers[0], &data->fibers[3]);
+	s_fiberAPI.Switch(data->fibers[0], data->fibers[3]);
 }
 
 static void Func2(void* dataPtr)
@@ -28,7 +28,7 @@ static void Func2(void* dataPtr)
 	const FiberData* const data = reinterpret_cast<FiberData*>(dataPtr);
 
 	printf("In func2 with fiberIndex %u\n", data->value);
-	s_fiberAPI.Switch(&data->fibers[1], &data->fibers[2]);
+	s_fiberAPI.Switch(data->fibers[1], data->fibers[2]);
 	printf("In func2 with fiberIndex %u\n", data->value);
 }
 
@@ -37,7 +37,7 @@ static void Func3(void* dataPtr)
 	const FiberData* const data = reinterpret_cast<FiberData*>(dataPtr);
 
 	printf("In func3 with fiberIndex %u\n", data->value);
-	s_fiberAPI.Switch(&data->fibers[2], &data->fibers[0]);
+	s_fiberAPI.Switch(data->fibers[2], data->fibers[0]);
 }
 
 static void Func4(void* dataPtr)
@@ -56,7 +56,7 @@ int main()
 	void* stackMemBase[numFibers];
 	void* stackBase[numFibers];
 	void* stackCeil[numFibers];
-	fiber::Fiber fibers[numFibers];
+	fiber::Fiber *fibers[numFibers];
 	FiberData data[numFibers];
 
 	s_fiberAPI = fiber::GetAPI(fiber::Options::OS_API_SAFETY | fiber::Options::PRESERVE_FPU_CONTROL);
@@ -77,7 +77,7 @@ int main()
 		fibers[fiberIndex] = s_fiberAPI.Create(stackBase[fiberIndex], stackSize, fiberFuncs[fiberIndex], &data[fiberIndex]);
 	}
 	
-	s_fiberAPI.Start(&fibers[0]);
+	s_fiberAPI.Start(fibers[0]);
 
 	printf("Back to main\n");
 

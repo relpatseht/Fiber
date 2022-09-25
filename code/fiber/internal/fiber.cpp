@@ -30,6 +30,14 @@
 # error Unknown processor.
 #endif //#else //#elif USING(PROC_ARM) //#elif USING(PROC_ARM64) //#elif USING(PROC_X86) //#if USING(PROC_X64)
 
+namespace fiber
+{
+	struct Fiber
+	{
+		uintptr_t* sp;
+	};
+}
+
 namespace
 {
 	using StartASMProc = void(void*);
@@ -89,27 +97,40 @@ namespace
 	template<fiber::Options Opts>
 	struct FiberAPIImpl
 	{
-		static fiber::Fiber Create(void* stack, size_t stackSize, fiber::FiberFunc startAddress, void* userData)
+		static fiber::Fiber* Create(void* stack, size_t stackSize, fiber::FiberFunc startAddress, void* userData)
 		{
-			uintptr_t* const stackCeil = reinterpret_cast<uintptr_t*>(stack);
-			uintptr_t* const stackBase = stackCeil + (stackSize / sizeof(uintptr_t));
-			fiber::Fiber out{ stackBase, stackCeil };
+			static constexpr unsigned STACK_ALIGN_MASK = STACK_ALIGN - 1;
+			const uintptr_t stackAddr = reinterpret_cast<uintptr_t>(stack);
+			const uintptr_t alignedStackAddr = (stackAddr + STACK_ALIGN_MASK) & ~STACK_ALIGN_MASK;
+			const size_t alignedStackMemSize = stackSize - (alignedStackAddr - stackAddr);
+			uintptr_t* const stackCeil = reinterpret_cast<uintptr_t*>(alignedStackAddr);
+			const size_t stackMemEntries = alignedStackMemSize / sizeof(uintptr_t);
+			const size_t stackEntries = stackMemEntries - (STACK_ALIGN/sizeof(uintptr_t));
+			uintptr_t* const stackBase = stackCeil + stackEntries;
+			fiber::Fiber* out = reinterpret_cast<fiber::Fiber*>(stackMemEntries);
 
-			out.sp = FiberASMAPI<Opts>::InitStackRegisters(stackBase, startAddress, userData, stackSize);
+			static_assert(sizeof(fiber::Fiber) <= STACK_ALIGN);
+
+			out->sp = FiberASMAPI<Opts>::InitStackRegisters(stackBase, startAddress, userData, stackEntries*sizeof(uintptr_t));
 
 			return out;
 		}
 
 		static void Start(fiber::Fiber* toFiber)
 		{
-			sanity(toFiber->stackHead[-1] == GetStackStartPlaceholder());
+			const uintptr_t* const stackHead = reinterpret_cast<uintptr_t*>(toFiber) + (STACK_ALIGN / sizeof(uintptr_t));
+
+			sanity(stackHead[-1] == GetStackStartPlaceholder());
 
 			FiberASMAPI<Opts>::StartASM(toFiber->sp);
 		}
 
 		static void Switch(fiber::Fiber* curFiber, fiber::Fiber* toFiber)
 		{
-			toFiber->stackHead[-1] = curFiber->stackHead[-1]; // copy around the return stack frame pointer
+			uintptr_t* const toStackHead = reinterpret_cast<uintptr_t*>(toFiber) + (STACK_ALIGN / sizeof(uintptr_t));
+			const uintptr_t* const curStackHead = reinterpret_cast<uintptr_t*>(curFiber) + (STACK_ALIGN / sizeof(uintptr_t));
+
+			toStackHead[-1] = curStackHead[-1]; // copy around the return stack frame pointer
 
 			FiberASMAPI<Opts>::SwitchFiberASM(curFiber, toFiber);
 		}
