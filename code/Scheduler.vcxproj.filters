@@ -24,7 +24,6 @@
     <ClInclude Include="shared\usings.h">
       <Filter>shared</Filter>
     </ClInclude>
-    <ClInclude Include="scheduler\internal\spsc_unbounded_queue.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="scheduler\internal\scheduler.cpp" />
