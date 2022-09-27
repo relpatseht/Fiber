@@ -19,6 +19,8 @@
 #include <optional>
 #include <algorithm>
 
+#define sanity(X) do{ if(!(X)) __debugbreak(); }while(0)
+
 /* Basic approach is to try to only use SPSC queues, which, with work stealing,
  * is a bit complex. Whenever any task creates a new task, the new task is added
  * to the active task's thread's unassignedTasks queue.
@@ -306,6 +308,8 @@ namespace
 		// rescheduled for execution on the appropriate reactor thread
 		// in the case of a wait, or this thread in case of a yield
 		spsc::fifo_queue<ScheduledFiber> stalledTasks{};
+
+		std::atomic_bool hasData = false;
 	};
 
 	struct ReactorThread
@@ -329,6 +333,139 @@ namespace
 	{
 		return a != scheduler::Options::NONE;
 	}
+
+	namespace task_thread
+	{
+		static constexpr size_t TASK_STACK_SIZE = 4096;
+
+		struct Context
+		{
+			scheduler::Scheduler* sch;
+			TaskThread* thisThread;
+			fiber::Fiber* rootFiber;
+			fiber::Fiber* curFiber;
+		};
+
+		struct TaskContext
+		{
+			Context* threadContext;
+			fiber::Fiber* taskFiber;
+			Task task;
+		};
+
+		static void FiberTask(void* userData)
+		{
+			TaskContext* const taskCtx = reinterpret_cast<TaskContext*>(userData);
+			fiber::Fiber* const taskFiber = taskCtx->taskFiber;
+			Context* const threadContext = taskCtx->threadContext;
+			FreeList** const freeStacks = &threadContext->thisThread->freeStacks;
+			fiber::FiberAPI api = threadContext->sch->fiberAPI;
+			void* const taskUserData = reinterpret_cast<void*>(taskCtx->task.userDataPtr);
+
+			taskCtx->task.TaskFunc(taskUserData);
+			if (taskCtx->task.ownedPtr)
+			{
+				delete[] taskUserData;
+			}
+
+			uint8_t* const taskStack = reinterpret_cast<uint8_t*>(taskFiber) - (TASK_STACK_SIZE - sizeof(fiber::Fiber*));
+			FreeList* const freeStack = reinterpret_cast<FreeList*>(taskStack);
+
+			freeStack->next = *freeStacks;
+			*freeStacks = freeStack;
+
+			api.Switch(taskFiber, threadContext->rootFiber);
+		}
+
+		static void FiberMain(void* userData)
+		{
+			Context* const ctx = reinterpret_cast<Context*>(userData);
+			fiber::FiberAPI api = ctx->sch->fiberAPI;
+			FreeList** freeStacks = &ctx->thisThread->freeStacks;
+			std::atomic_bool* const running = &ctx->sch->running;
+			std::atomic_bool* const workPumpLock = &ctx->sch->workPumpLock;
+			std::atomic_bool* const workAvailable = &ctx->thisThread->hasData;
+			spsc::fifo_queue<fiber::Fiber*>* const activeFibers = &ctx->thisThread->runningTasks;
+			spsc::ring_buffer<Task, THREAD_WAIT_QUEUE_SIZE_LG2>* const waitingTasks = &ctx->thisThread->tasksAwaitingExecution;
+
+			for(;;)
+			{
+				while (std::optional<fiber::Fiber*> nextFiber = spsc::queue::try_pop(activeFibers))
+				{
+					sanity(nextFiber.has_value());
+
+					ctx->curFiber = nextFiber.value();
+					api.Switch(ctx->rootFiber, ctx->curFiber);
+				}
+
+				while (std::optional<Task> nextTask = spsc::ring::try_pop(waitingTasks))
+				{
+					sanity(nextTask.has_value());
+
+					TaskContext taskCtx{ ctx, nullptr, nextTask.value() };
+					void* stackMem = *freeStacks;
+
+					if (stackMem)
+					{
+						*freeStacks = (*freeStacks)->next;
+					}
+					else
+					{
+						stackMem = new uint8_t[TASK_STACK_SIZE];
+					}
+
+					fiber::Fiber* const newFiber = api.Create(stackMem, TASK_STACK_SIZE, &FiberTask, &taskCtx);
+					taskCtx.taskFiber = newFiber;
+					ctx->curFiber = newFiber;
+					api.Switch(ctx->rootFiber, newFiber);
+				}
+
+				if (!workPumpLock->exchange(true, std::memory_order_acq_rel))
+				{
+					scheduler::Scheduler* const sch = ctx->sch;
+					const unsigned taskThreadCount = sch->taskThreadCount;
+					for (unsigned threadIndex = 0; threadIndex < taskThreadCount; ++threadIndex)
+					{
+						TaskThread* const thread = sch->taskThreads + threadIndex;
+
+						while (std::optional<ScheduledFiber> fiber = spsc::queue::try_pop(&thread->stalledTasks))
+						{
+							sanity(fiber.has_value());
+							const unsigned destIndex = fiber->threadId;
+
+							if (destIndex < taskThreadCount)
+							{
+								sanity(destIndex == threadIndex);
+								spsc::queue::push(&thread->runningTasks, fiber->fiber);
+							}
+							else
+							{
+								const unsigned reactorIndex = destIndex - taskThreadCount;
+
+								sanity(reactorIndex < sch->reactorThreadCount);
+								spsc::queue::push(&sch->reactorThreads[reactorIndex].runningTasks, fiber->fiber);
+							}
+						}
+					}
+
+					// do the task spreading
+
+					workPumpLock->store(false, std::memory_order_release);
+				}
+
+				bool trueVal = true;
+				WaitOnAddress(workAvailable, &trueVal, sizeof(trueVal), INFINITE);\
+			}
+		}
+
+		static void ThreadMain(scheduler::Scheduler* sch, unsigned threadIndex)
+		{
+			Context ctx{ sch, sch->taskThreads + threadIndex };
+
+			ctx.rootFiber = sch->fiberAPI.Create(new uint8_t[1024], 1024, FiberMain, &ctx);
+			sch->fiberAPI.Start(ctx.rootFiber);
+		}
+	}
 }
 
 namespace scheduler
@@ -341,6 +478,9 @@ namespace scheduler
 		std::atomic_uint32_t* activeTaskThreads;
 		uint32_t taskThreadCount;
 		uint32_t reactorThreadCount;
+		std::atomic_bool running;
+		uint8_t _cachePad1[64 - sizeof(running)];
+		std::atomic_bool workPumpLock;
 	};
 }
 
@@ -377,6 +517,9 @@ namespace scheduler
 			out->fiberAPI = fiber::GetAPI(fiberOpts);
 		}
 
+		out->running.store(true, std::memory_order_relaxed);
+		out->workPumpLock.store(true, std::memory_order_relaxed);
+
 		out->taskThreadCount = taskThreadCount;
 		out->taskThreads = new TaskThread[taskThreadCount];
 		out->reactorThreadCount = 0;
@@ -394,15 +537,17 @@ namespace scheduler
 		for (unsigned threadIndex = 1; threadIndex < taskThreadCount; ++threadIndex)
 		{
 			TaskThread* const thread = out->taskThreads + threadIndex;
-			const std::wstring threadName = L"Task Thread";
-			wchar_t threadIdBuf[8];
 
-			thread->thread = std::thread(TaskThreadFunc, out, threadIndex);
+			thread->thread = std::thread(task_thread::ThreadMain, out, threadIndex);
 
 			{
+				const std::wstring threadName = L"Task Thread ";
 				std::thread::native_handle_type threadHandle = thread->thread.native_handle();
+				wchar_t threadIdBuf[8];
 
+				// Pin and name task threads
 				_itow_s(threadIndex, threadIdBuf, 10);
+				SetThreadIdealProcessor(threadHandle, threadIndex / 64);
 				SetThreadAffinityMask(threadHandle, 1ull << (threadIndex & 63));
 				SetThreadDescription(threadHandle, (threadName + threadIdBuf).c_str());
 			}
@@ -411,11 +556,27 @@ namespace scheduler
 
 	void Destroy(Scheduler* sch)
 	{
+		sch->running.store(false, std::memory_order_release);
+		WakeByAddressAll(&sch->running);
 
-	}
+		for (unsigned threadIndex = 1; threadIndex < sch->taskThreadCount; ++threadIndex)
+		{
+			TaskThread* thread = sch->taskThreads + threadIndex;
 
-	void SetDefault(Scheduler* sch)
-	{
+			thread->thread.join();
+			while (thread->freeStacks)
+			{
+				FreeList* const next = thread->freeStacks->next;
+				delete[] thread->freeStacks;
+				thread->freeStacks = next;
+			}
+		}
 
+		delete[] sch->taskThreads;
+		delete[] sch->reactorThreads;
+		delete[] sch->activeTaskThreads;
+
+		memset(sch, 0, sizeof(*sch));
+		delete sch;
 	}
 }
