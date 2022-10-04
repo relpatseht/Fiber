@@ -348,8 +348,10 @@ namespace
 
 		struct TaskContext
 		{
-			Context* threadContext;
 			fiber::Fiber* taskFiber;
+			fiber::Fiber* rootFiber;
+			FreeList** freeStacks;
+			const fiber::FiberAPI* fiberAPI;
 			Task task;
 		};
 
@@ -357,9 +359,8 @@ namespace
 		{
 			TaskContext* const taskCtx = reinterpret_cast<TaskContext*>(userData);
 			fiber::Fiber* const taskFiber = taskCtx->taskFiber;
-			Context* const threadContext = taskCtx->threadContext;
-			FreeList** const freeStacks = &threadContext->thisThread->freeStacks;
-			fiber::FiberAPI api = threadContext->sch->fiberAPI;
+			FreeList** const freeStacks = taskCtx->freeStacks;
+			const fiber::FiberAPI& api = *taskCtx->fiberAPI;
 			void* const taskUserData = reinterpret_cast<void*>(taskCtx->task.userDataPtr);
 
 			taskCtx->task.TaskFunc(taskUserData);
@@ -374,7 +375,46 @@ namespace
 			freeStack->next = *freeStacks;
 			*freeStacks = freeStack;
 
-			api.Switch(taskFiber, threadContext->rootFiber);
+			api.Switch(taskFiber, taskCtx->rootFiber);
+		}
+
+		namespace run
+		{
+			static void DrainExecuteActive(const fiber::FiberAPI& api, fiber::Fiber *rootFiber, spsc::fifo_queue<fiber::Fiber*>* activeFibers, fiber::Fiber** curFiber)
+			{
+				while (std::optional<fiber::Fiber*> nextFiber = spsc::queue::try_pop(activeFibers))
+				{
+					sanity(nextFiber.has_value());
+
+					*curFiber = nextFiber.value();
+					api.Switch(rootFiber, *curFiber);
+				}
+			}
+
+			static void DrainExecuteWaiting(const fiber::FiberAPI& api, fiber::Fiber *rootFiber, fiber::Fiber **curFiber, FreeList **freeStacks, spsc::ring_buffer<Task, THREAD_WAIT_QUEUE_SIZE_LG2>* waitingTasks)
+			{
+				while (std::optional<Task> nextTask = spsc::ring::try_pop(waitingTasks))
+				{
+					sanity(nextTask.has_value());
+
+					TaskContext taskCtx{ nullptr, rootFiber, freeStacks, &api, nextTask.value() };
+					void* stackMem = *freeStacks;
+
+					if (stackMem)
+					{
+						*freeStacks = (*freeStacks)->next;
+					}
+					else
+					{
+						stackMem = new uint8_t[TASK_STACK_SIZE];
+					}
+
+					fiber::Fiber* const newFiber = api.Create(stackMem, TASK_STACK_SIZE, &FiberTask, &taskCtx);
+					taskCtx.taskFiber = newFiber;
+					*curFiber = newFiber;
+					api.Switch(rootFiber, newFiber);
+				}
+			}
 		}
 
 		static void FiberMain(void* userData)
@@ -390,35 +430,9 @@ namespace
 
 			for(;;)
 			{
-				while (std::optional<fiber::Fiber*> nextFiber = spsc::queue::try_pop(activeFibers))
-				{
-					sanity(nextFiber.has_value());
+				run::DrainExecuteActive(api, ctx->rootFiber, activeFibers, &ctx->curFiber);
 
-					ctx->curFiber = nextFiber.value();
-					api.Switch(ctx->rootFiber, ctx->curFiber);
-				}
-
-				while (std::optional<Task> nextTask = spsc::ring::try_pop(waitingTasks))
-				{
-					sanity(nextTask.has_value());
-
-					TaskContext taskCtx{ ctx, nullptr, nextTask.value() };
-					void* stackMem = *freeStacks;
-
-					if (stackMem)
-					{
-						*freeStacks = (*freeStacks)->next;
-					}
-					else
-					{
-						stackMem = new uint8_t[TASK_STACK_SIZE];
-					}
-
-					fiber::Fiber* const newFiber = api.Create(stackMem, TASK_STACK_SIZE, &FiberTask, &taskCtx);
-					taskCtx.taskFiber = newFiber;
-					ctx->curFiber = newFiber;
-					api.Switch(ctx->rootFiber, newFiber);
-				}
+				run::DrainExecuteWaiting(api, ctx->rootFiber, &ctx->curFiber, freeStacks, waitingTasks);
 
 				if (!workPumpLock->exchange(true, std::memory_order_acq_rel))
 				{
