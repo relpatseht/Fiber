@@ -72,6 +72,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="scheduler\internal\power_two.h" />
+    <ClInclude Include="scheduler\internal\spsc_ring_buffer.h" />
+    <ClInclude Include="scheduler\internal\spsc_queue.h" />
     <ClInclude Include="scheduler\scheduler\scheduler.h" />
     <ClInclude Include="scheduler\scheduler\task.h" />
     <ClInclude Include="scheduler\scheduler\thread.h" />
