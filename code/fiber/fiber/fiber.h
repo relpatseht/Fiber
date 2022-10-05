@@ -23,7 +23,7 @@ namespace fiber
 
 	constexpr bool operator!(Options a)
 	{
-		return a == Options::NONE;
+		return a != Options::NONE;
 	}
 
 	constexpr Options operator~(Options a)
