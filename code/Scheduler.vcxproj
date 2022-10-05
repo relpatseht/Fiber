@@ -79,6 +79,7 @@
     <ClInclude Include="scheduler\scheduler\task.h" />
     <ClInclude Include="scheduler\scheduler\thread.h" />
     <ClInclude Include="shared\platform.h" />
+    <ClInclude Include="shared\sanity.h" />
     <ClInclude Include="shared\usings.h" />
   </ItemGroup>
   <ItemGroup>

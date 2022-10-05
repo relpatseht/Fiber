@@ -3,6 +3,7 @@
 #include <atomic>
 #include <optional>
 #include <algorithm>
+#include "sanity.h"
 #include "power_two.h"
 #include "spsc_ring_buffer.h"
 

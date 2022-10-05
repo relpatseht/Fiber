@@ -76,6 +76,7 @@
     <ClInclude Include="fiber\internal\concat_arrays.h" />
     <ClInclude Include="fiber\internal\register_definitions.h" />
     <ClInclude Include="shared\platform.h" />
+    <ClInclude Include="shared\sanity.h" />
     <ClInclude Include="shared\usings.h" />
   </ItemGroup>
   <ItemGroup>

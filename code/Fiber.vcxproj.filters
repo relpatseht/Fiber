@@ -20,6 +20,9 @@
     <ClInclude Include="shared\platform.h">
       <Filter>shared</Filter>
     </ClInclude>
+    <ClInclude Include="shared\sanity.h">
+      <Filter>shared</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="fiber\internal\fiber.cpp" />

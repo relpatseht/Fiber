@@ -1,4 +1,5 @@
 #include "platform.h"
+#include "sanity.h"
 
 #if USING(OS_WINDOWS)
 # define WIN32_LEAN_AND_MEAN
@@ -21,8 +22,6 @@
 #include <atomic>
 #include <optional>
 #include <algorithm>
-
-#define sanity(X) do{ if(!(X)) __debugbreak(); }while(0)
 
 /* Basic approach is to try to only use SPSC queues, which, with work stealing,
  * is a bit complex. Whenever any task creates a new task, the new task is added

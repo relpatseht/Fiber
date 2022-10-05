@@ -1,5 +1,6 @@
 #include <cstring>
 #include "platform.h"
+#include "sanity.h"
 #include "register_definitions.h"
 #include "concat_arrays.h"
 #include "../fiber/fiber.h"
@@ -15,8 +16,6 @@
 # include <ucontext.h>
 # undef _FORTIFY_SOURCE
 #endif //#elif USING(OS_LINUX) //#if USING(OS_WINDOWS)
-
-#define sanity(X) do{ if(!(X)) __debugbreak(); }while(0)
 
 #if USING(PROC_X64)
 # define BYTECODE_INL "x64_fiber_bytecode.inl"
@@ -125,7 +124,7 @@ namespace
 
 			out->sp = FiberASMAPI<Opts>::InitStackRegisters(stackBase, startAddress, userData, stackEntries*sizeof(uintptr_t));
 
-			sanity(out->sp >= stackCeil, "Not enough stack space to hold base context");
+			sanity(out->sp >= stackCeil && "Not enough stack space to hold base context");
 
 			return out;
 		}
