@@ -15,10 +15,30 @@ namespace fiber
 	{
 		return static_cast<Options>(static_cast<unsigned>(a) | static_cast<unsigned>(b));
 	}
+	
+	constexpr Options operator&(Options a, Options b)
+	{
+		return static_cast<Options>(static_cast<unsigned>(a) | static_cast<unsigned>(b));
+	}
 
-	constexpr Options& operator|=(Options& a, Options b)
+	constexpr bool operator!(Options a)
+	{
+		return a == Options::NONE;
+	}
+
+	constexpr Options operator~(Options a)
+	{
+		return static_cast<Options>(~static_cast<unsigned>(a));
+	}
+
+	inline Options& operator|=(Options& a, Options b)
 	{
 		return reinterpret_cast<Options&>(reinterpret_cast<unsigned&>(a) |= static_cast<unsigned>(b));
+	}
+	
+	inline Options& operator&=(Options& a, Options b)
+	{
+		return reinterpret_cast<Options&>(reinterpret_cast<unsigned&>(a) &= static_cast<unsigned>(b));
 	}
 
 	struct Fiber;
