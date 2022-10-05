@@ -92,6 +92,8 @@ namespace
 		// in the case of a wait, or this thread in case of a yield
 		spsc::fifo_queue<ScheduledFiber> stalledTasks{};
 
+		unsigned id;
+		unsigned char _padding[3];
 		std::atomic_bool hasData = false;
 	};
 
@@ -106,7 +108,26 @@ namespace
 		// wait and now need to be returned to their parent thread
 		spsc::fifo_queue<ScheduledFiber> finishedTasks{};
 	};
+}
 
+namespace scheduler
+{
+	struct Scheduler
+	{
+		fiber::FiberAPI fiberAPI;
+		TaskThread* taskThreads;
+		ReactorThread* reactorThreads;
+		std::atomic_uint32_t* activeTaskThreads;
+		uint32_t taskThreadCount;
+		uint32_t reactorThreadCount;
+		std::atomic_bool running;
+		uint8_t _cachePad1[64 - sizeof(running)];
+		std::atomic_bool workPumpLock;
+	};
+}
+
+namespace
+{
 	constexpr scheduler::Options operator&(scheduler::Options a, scheduler::Options b)
 	{
 		return static_cast<scheduler::Options>(static_cast<unsigned>(a) & static_cast<unsigned>(b));
@@ -205,7 +226,7 @@ namespace
 			Context* const ctx = reinterpret_cast<Context*>(userData);
 			fiber::FiberAPI api = ctx->sch->fiberAPI;
 			FreeList** freeStacks = &ctx->thisThread->freeStacks;
-			std::atomic_bool* const running = &ctx->sch->running;
+			//std::atomic_bool* const running = &ctx->sch->running;
 			std::atomic_bool* const workPumpLock = &ctx->sch->workPumpLock;
 			std::atomic_bool* const workAvailable = &ctx->thisThread->hasData;
 			spsc::fifo_queue<fiber::Fiber*>* const activeFibers = &ctx->thisThread->runningTasks;
@@ -240,7 +261,7 @@ namespace
 								const unsigned reactorIndex = destIndex - taskThreadCount;
 
 								sanity(reactorIndex < sch->reactorThreadCount);
-								spsc::queue::push(&sch->reactorThreads[reactorIndex].runningTasks, fiber->fiber);
+								spsc::queue::push(&sch->reactorThreads[reactorIndex].runningTasks, ScheduledFiber{ fiber->fiber, ctx->thisThread->id });
 							}
 						}
 					}
@@ -263,22 +284,6 @@ namespace
 			sch->fiberAPI.Start(ctx.rootFiber);
 		}
 	}
-}
-
-namespace scheduler
-{
-	struct Scheduler
-	{
-		fiber::FiberAPI fiberAPI;
-		TaskThread* taskThreads;
-		ReactorThread* reactorThreads;
-		std::atomic_uint32_t* activeTaskThreads;
-		uint32_t taskThreadCount;
-		uint32_t reactorThreadCount;
-		std::atomic_bool running;
-		uint8_t _cachePad1[64 - sizeof(running)];
-		std::atomic_bool workPumpLock;
-	};
 }
 
 namespace scheduler
@@ -336,6 +341,7 @@ namespace scheduler
 			TaskThread* const thread = out->taskThreads + threadIndex;
 
 			thread->thread = std::thread(task_thread::ThreadMain, out, threadIndex);
+			thread->id = threadIndex;
 
 			{
 				const std::wstring threadName = L"Task Thread ";
@@ -349,6 +355,8 @@ namespace scheduler
 				SetThreadDescription(threadHandle, (threadName + threadIdBuf).c_str());
 			}
 		}
+
+		return out;
 	}
 
 	void Destroy(Scheduler* sch)

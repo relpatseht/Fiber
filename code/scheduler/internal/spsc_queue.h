@@ -35,7 +35,7 @@ namespace spsc
 		node* first;
 		node* headCopy;
 
-		fifo_queue() : head(new node), tail(head), first(head.load(std::memory_order_relaxed)), headCopy(head.load(std::memory_order_relaxed))
+		fifo_queue() : head(new node), tail(head.load(std::memory_order_relaxed)), first(head.load(std::memory_order_relaxed)), headCopy(head.load(std::memory_order_relaxed))
 		{
 			headCopy->next.store(nullptr, std::memory_order_relaxed);
 		}
@@ -120,7 +120,7 @@ namespace spsc
 
 			for (;;)
 			{
-				std::optional<T> ret = ring::try_pop(&curHead->val);
+				std::optional<T> ret = ring::try_pop(&curHead->value);
 
 				sanity(curHead);
 
