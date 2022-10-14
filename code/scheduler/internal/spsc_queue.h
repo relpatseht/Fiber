@@ -157,7 +157,7 @@ namespace spsc
 
 			sanity(curHead);
 
-			if (ring::current_size(*curHead) != 0)
+			if (ring::current_size(curHead->value) != 0)
 			{
 				return false;
 			}
