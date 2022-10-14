@@ -420,8 +420,21 @@ namespace
 		{
 			Context ctx{ sch, sch->taskThreads + threadIndex };
 
-			ctx.rootFiber = sch->fiberAPI.Create(new uint8_t[1024], 1024, FiberMain, &ctx);
+			ctx.rootFiber = sch->fiberAPI.Create(new uint8_t[TASK_STACK_SIZE], TASK_STACK_SIZE, FiberMain, &ctx);
 			sch->fiberAPI.Start(ctx.rootFiber);
+		}
+	}
+
+	namespace reactor_thread
+	{
+
+		static void ThreadMain(scheduler::Scheduler* sch, unsigned threadId)
+		{
+			const unsigned threadIndex = threadId - sch->taskThreadCount;
+
+			sanity(threadId > sch->taskThreadCount);
+			sanity(threadIndex < sch->reactorThreadCount);
+
 		}
 	}
 }
