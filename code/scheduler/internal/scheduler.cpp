@@ -349,7 +349,11 @@ namespace
 							}
 							break;
 							case writeThread->tasksAwaitingExecution.CAPACITY:
-								// Now has data, previously didn't. Wake up.
+								if (!writeThread->hasData.exchange(true))
+								{
+									// Now has data, previously didn't. Wake up.
+									WakeByAddressSingle(&writeThread->hasData);
+								}
 								break;
 							}
 
@@ -380,7 +384,6 @@ namespace
 			for(;;)
 			{
 				run::DrainExecuteActive(api, ctx->rootFiber, activeFibers, &ctx->curFiber);
-
 				run::DrainExecuteWaiting(api, ctx->rootFiber, &ctx->curFiber, freeStacks, waitingTasks);
 
 				if (!workPumpLock->exchange(true, std::memory_order_acq_rel))
@@ -394,8 +397,13 @@ namespace
 					workPumpLock->store(false, std::memory_order_release);
 				}
 
-				bool trueVal = true;
-				WaitOnAddress(workAvailable, &trueVal, sizeof(trueVal), INFINITE);\
+				if (spsc::ring::current_size(*waitingTasks) == 0 && spsc::queue::is_empty(*activeFibers))
+				{
+					bool trueVal = true;
+
+					workAvailable->store(false, std::memory_order_release);
+					WaitOnAddress(workAvailable, &trueVal, sizeof(trueVal), INFINITE);
+				}
 			}
 		}
 
