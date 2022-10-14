@@ -11,8 +11,8 @@ namespace spsc
 		static_assert(std::is_trivially_destructible_v<T>);
 		static_assert(std::is_trivially_constructible_v<T>);
 
-		static constexpr unsigned CAPACITY = 1u << SizeLg2;
-		static constexpr unsigned CAPACITY_MASK = SIZE - 1;
+		static constexpr unsigned CAPACITY = 1u << CapacityLg2;
+		static constexpr unsigned CAPACITY_MASK = CAPACITY - 1;
 
 		std::atomic_uint32_t tail = 0;
 		T buf[CAPACITY];
@@ -62,6 +62,12 @@ namespace spsc
 			const unsigned curHead = ring.head.load(std::memory_order_acquire);
 
 			return ring.CAPACITY - (curTail - curHead);
+		}
+
+		template<typename T, unsigned CapacityLg2>
+		static constexpr unsigned capacity(const ring_buffer<T, CapacityLg2>& r)
+		{
+			return r.CAPACITY;
 		}
 	}
 }
