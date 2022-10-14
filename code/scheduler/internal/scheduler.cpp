@@ -311,19 +311,19 @@ namespace
 
 				// Take from each threads unassigned list and push to a write thread one by one. Not the best for
 				// cache, but most fair.
-				unsigned tasksAdded = 0;
+				unsigned writeIndex = 0;
 				for (;writeableThreadCount > 0;)
 				{
-					const unsigned prevTasksAdded = tasksAdded;
+					bool taskAdded = false;
 
-					for (unsigned readThreadIndex = 0; readThreadIndex < taskThreadCount; ++readThreadIndex)
+					for (unsigned readThreadIndex = 0; readThreadIndex < taskThreadCount && writeableThreadCount > 0; ++readThreadIndex)
 					{
 						TaskThread* const readThread = sch->taskThreads + readThreadIndex;
 
 						if (std::optional<Task> task = spsc::queue::try_pop(&readThread->unassignedTasks))
 						{
 							sanity(task.has_value());
-							const unsigned writeThreadIndex = tasksAdded % writeableThreadCount;
+							const unsigned writeThreadIndex = writeIndex % writeableThreadCount;
 							TaskThread* const writeThread = writeableThreads[writeThreadIndex];
 							const bool pushed = spsc::ring::try_push(&writeThread->tasksAwaitingExecution, *task);
 							const uint8_t oldOpenSlots = writeableOpenSlots[writeThreadIndex]--;
@@ -354,15 +354,17 @@ namespace
 									// Now has data, previously didn't. Wake up.
 									WakeByAddressSingle(&writeThread->hasData);
 								}
-								break;
+							[[fallthrough]]
+							default:
+								++writeIndex;
 							}
 
-							++tasksAdded;
+							taskAdded = true;
 						}
 					}
 
 					// No new waiting tasks, end
-					if (tasksAdded == prevTasksAdded)
+					if (!taskAdded)
 					{
 						break;
 					}
