@@ -375,7 +375,7 @@ namespace
 			Context* const ctx = reinterpret_cast<Context*>(userData);
 			fiber::FiberAPI api = ctx->sch->fiberAPI;
 			FreeList** freeStacks = &ctx->thisThread->freeStacks;
-			//std::atomic_bool* const running = &ctx->sch->running;
+			std::atomic_bool* const running = &ctx->sch->running;
 			std::atomic_bool* const workPumpLock = &ctx->sch->workPumpLock;
 			std::atomic_bool* const workAvailable = &ctx->thisThread->hasData;
 			spsc::fifo_queue<fiber::Fiber*>* const activeFibers = &ctx->thisThread->runningTasks;
@@ -399,10 +399,17 @@ namespace
 
 				if (spsc::ring::current_size(*waitingTasks) == 0 && spsc::queue::is_empty(*activeFibers))
 				{
-					bool trueVal = true;
+					if (!running->load(std::memory_order_acquire))
+					{
+						break;
+					}
+					else
+					{
+						bool trueVal = true;
 
-					workAvailable->store(false, std::memory_order_release);
-					WaitOnAddress(workAvailable, &trueVal, sizeof(trueVal), INFINITE);
+						workAvailable->store(false, std::memory_order_release);
+						WaitOnAddress(workAvailable, &trueVal, sizeof(trueVal), INFINITE);
+					}
 				}
 			}
 		}
