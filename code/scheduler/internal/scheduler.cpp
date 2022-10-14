@@ -42,7 +42,7 @@
 
 namespace
 {
-	static constexpr unsigned THREAD_WAIT_QUEUE_SIZE_LG2 = 4;
+	static constexpr unsigned THREAD_WAIT_QUEUE_SIZE_LG2 = 3;
 
 	struct Task
 	{
@@ -221,6 +221,121 @@ namespace
 			}
 		}
 
+		namespace schedule
+		{
+			static void DrainStalledTasks(scheduler::Scheduler* sch)
+			{
+				const unsigned taskThreadCount = sch->taskThreadCount;
+
+				for (unsigned threadIndex = 0; threadIndex < taskThreadCount; ++threadIndex)
+				{
+					TaskThread* const thread = sch->taskThreads + threadIndex;
+
+					while (std::optional<ScheduledFiber> fiber = spsc::queue::try_pop(&thread->stalledTasks))
+					{
+						sanity(fiber.has_value());
+						const unsigned destIndex = fiber->threadId;
+
+						if (destIndex < taskThreadCount)
+						{
+							sanity(destIndex == threadIndex);
+							spsc::queue::push(&thread->runningTasks, fiber->fiber);
+						}
+						else
+						{
+							const unsigned reactorIndex = destIndex - taskThreadCount;
+
+							sanity(reactorIndex < sch->reactorThreadCount);
+							spsc::queue::push(&sch->reactorThreads[reactorIndex].runningTasks, ScheduledFiber{ fiber->fiber, thread->id });
+						}
+					}
+				}
+			}
+
+			static void DrainReactors(scheduler::Scheduler* sch)
+			{
+				const unsigned taskThreadCount = sch->taskThreadCount;
+				const unsigned reactorThreadCount = sch->reactorThreadCount;
+
+				for (unsigned threadIndex = 0; threadIndex < reactorThreadCount; ++threadIndex)
+				{
+					ReactorThread* const thread = sch->reactorThreads + threadIndex;
+
+					while (std::optional<ScheduledFiber> fiber = spsc::queue::try_pop(&thread->finishedTasks))
+					{
+						sanity(fiber.has_value());
+						const unsigned destIndex = fiber->threadId;
+
+						sanity(destIndex < taskThreadCount);
+						spsc::queue::push(&sch->taskThreads[destIndex].runningTasks, fiber->fiber);
+					}
+				}
+			}
+
+			static void AssignNewTasksToThreads(scheduler::Scheduler* sch)
+			{
+				const unsigned taskThreadCount = sch->taskThreadCount;
+				const unsigned taskThreadDWordCount = (taskThreadCount + 31) & ~31;
+				TaskThread** const writeableThreads = reinterpret_cast<TaskThread**>(_alloca(sizeof(TaskThread*) * taskThreadCount));
+				uint8_t* const writeableOpenSlots = reinterpret_cast<uint8_t*>(_alloca(sizeof(uint8_t) * taskThreadCount));
+				unsigned writeableThreadCount = 0;
+
+				for (unsigned activeTaskThreadDWordIndex = 0; activeTaskThreadDWordIndex < taskThreadDWordCount; ++activeTaskThreadDWordIndex)
+				{
+					const uint32_t activeDWordThreads = sch->activeTaskThreads[activeTaskThreadDWordIndex].load(std::memory_order_acquire);
+					const unsigned threadStartIndex = activeTaskThreadDWordIndex * 32;
+					const unsigned threadEndIndex = std::min(threadStartIndex + 32, taskThreadCount);
+
+					for (unsigned threadIndex = threadStartIndex; threadIndex < threadEndIndex; ++threadIndex)
+					{
+						const unsigned threadBit = threadIndex & 31;
+
+						if (activeDWordThreads & (1u << threadBit))
+						{
+							TaskThread* const writeThread = sch->taskThreads + threadIndex;
+
+						}
+					}
+				}
+
+				// Take from each threads unassigned list and push to a write thread one by one. Not the best for
+				// cache, but most fair.
+				for (;;)
+				{
+					for (unsigned readThreadIndex = 0; readThreadIndex < taskThreadCount; ++readThreadIndex)
+					{
+						TaskThread* const readThread = sch->taskThreads + readThreadIndex;
+
+						if (std::optional<Task> task = spsc::queue::try_pop(&readThread->unassignedTasks))
+						{
+							unsigned writeThreadIndexOffset;
+
+							sanity(task.has_value());
+
+							for (writeThreadIndexOffset = 0; writeThreadIndexOffset < taskThreadCount; ++writeThreadIndexOffset)
+							{
+								const unsigned writeThreadIndex = (readThreadIndex + writeThreadIndexOffset) % taskThreadCount;
+								const unsigned writeThreadDWordIndex = writeThreadIndex / 31;
+								const unsigned writeThreadDWordBit = writeThreadIndex & 31;
+
+								if (activeTaskThreads[writeThreadDWordIndex] & (1u << writeThreadDWordBit))
+								{
+									TaskThread* const writeThread = sch->taskThreads + writeThreadIndex;
+
+									if (spsc::ring::try_push(&writeThread->tasksAwaitingExecution, *task))
+									{
+										break;
+									}
+								}
+							}
+
+
+						}
+					}
+				}
+			}
+		}
+
 		static void FiberMain(void* userData)
 		{
 			Context* const ctx = reinterpret_cast<Context*>(userData);
@@ -241,30 +356,9 @@ namespace
 				if (!workPumpLock->exchange(true, std::memory_order_acq_rel))
 				{
 					scheduler::Scheduler* const sch = ctx->sch;
-					const unsigned taskThreadCount = sch->taskThreadCount;
-					for (unsigned threadIndex = 0; threadIndex < taskThreadCount; ++threadIndex)
-					{
-						TaskThread* const thread = sch->taskThreads + threadIndex;
-
-						while (std::optional<ScheduledFiber> fiber = spsc::queue::try_pop(&thread->stalledTasks))
-						{
-							sanity(fiber.has_value());
-							const unsigned destIndex = fiber->threadId;
-
-							if (destIndex < taskThreadCount)
-							{
-								sanity(destIndex == threadIndex);
-								spsc::queue::push(&thread->runningTasks, fiber->fiber);
-							}
-							else
-							{
-								const unsigned reactorIndex = destIndex - taskThreadCount;
-
-								sanity(reactorIndex < sch->reactorThreadCount);
-								spsc::queue::push(&sch->reactorThreads[reactorIndex].runningTasks, ScheduledFiber{ fiber->fiber, ctx->thisThread->id });
-							}
-						}
-					}
+					
+					schedule::DrainStalledTasks(sch);
+					schedule::DrainReactors(sch);
 
 					// do the task spreading
 
