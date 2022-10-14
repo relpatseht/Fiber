@@ -148,5 +148,25 @@ namespace spsc
 
 			return std::nullopt;
 		}
+
+		template<typename T>
+		static bool is_empty(const fifo_queue<T>& q)
+		{
+			using node = typename fifo_queue<T>::node;
+			const node* const curHead = q.head.load(std::memory_order_acquire);
+
+			sanity(curHead);
+
+			if (ring::current_size(*curHead) != 0)
+			{
+				return false;
+			}
+			else
+			{
+				const node* const curTail = q.tail.load(std::memory_order_acquire);
+
+				return curHead != curTail;
+			}
+		}
 	}
 }
