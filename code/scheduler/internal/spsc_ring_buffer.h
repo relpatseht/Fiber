@@ -29,7 +29,7 @@ namespace spsc
 
 			if (curTail - curHead < ring->CAPACITY)
 			{
-				ring->buf[curTail & ring->SIZE_MASK] = std::move(val);
+				ring->buf[curTail & ring->CAPACITY_MASK] = std::move(val);
 				ring->tail.store(curTail + 1, std::memory_order_release); // Release the new value to the consumer thread
 
 				return true;
