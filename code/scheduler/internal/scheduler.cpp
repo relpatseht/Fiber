@@ -293,44 +293,74 @@ namespace
 						if (activeDWordThreads & (1u << threadBit))
 						{
 							TaskThread* const writeThread = sch->taskThreads + threadIndex;
+							const auto& writeTaskQueue = writeThread->tasksAwaitingExecution;
+							const unsigned openSlots = writeTaskQueue.CAPACITY - spsc::ring::current_size(writeTaskQueue);
 
+							sanity(openSlots < writeTaskQueue.CAPACITY);
+
+							if ( openSlots > 0 )
+							{
+								writeableOpenSlots[writeableThreadCount] = static_cast<uint8_t>(openSlots);
+								writeableThreads[writeableThreadCount++] = writeThread;
+							}
 						}
 					}
 				}
 
+				sanity(writeableThreadCount <= taskThreadCount);
+
 				// Take from each threads unassigned list and push to a write thread one by one. Not the best for
 				// cache, but most fair.
-				for (;;)
+				unsigned tasksAdded = 0;
+				for (;writeableThreadCount > 0;)
 				{
+					const unsigned prevTasksAdded = tasksAdded;
+
 					for (unsigned readThreadIndex = 0; readThreadIndex < taskThreadCount; ++readThreadIndex)
 					{
 						TaskThread* const readThread = sch->taskThreads + readThreadIndex;
 
 						if (std::optional<Task> task = spsc::queue::try_pop(&readThread->unassignedTasks))
 						{
-							unsigned writeThreadIndexOffset;
-
 							sanity(task.has_value());
+							const unsigned writeThreadIndex = tasksAdded % writeableThreadCount;
+							TaskThread* const writeThread = writeableThreads[writeThreadIndex];
+							const bool pushed = spsc::ring::try_push(&writeThread->tasksAwaitingExecution, *task);
+							const uint8_t oldOpenSlots = writeableOpenSlots[writeThreadIndex]--;
 
-							for (writeThreadIndexOffset = 0; writeThreadIndexOffset < taskThreadCount; ++writeThreadIndexOffset)
+							sanity(pushed);
+
+							switch (oldOpenSlots)
 							{
-								const unsigned writeThreadIndex = (readThreadIndex + writeThreadIndexOffset) % taskThreadCount;
-								const unsigned writeThreadDWordIndex = writeThreadIndex / 31;
-								const unsigned writeThreadDWordBit = writeThreadIndex & 31;
+							case 0:
+								sanity(0 && "unreachable");
+							case 1:
+							{
+								// No more open slots on this thread, so remove it from the writeable list
+								const unsigned writeableEnd = writeableThreadCount - 1;
 
-								if (activeTaskThreads[writeThreadDWordIndex] & (1u << writeThreadDWordBit))
+								if (writeableEnd != writeThreadIndex)
 								{
-									TaskThread* const writeThread = sch->taskThreads + writeThreadIndex;
-
-									if (spsc::ring::try_push(&writeThread->tasksAwaitingExecution, *task))
-									{
-										break;
-									}
+									writeableOpenSlots[writeThreadIndex] = writeableOpenSlots[writeableEnd];
+									writeableThreads[writeThreadIndex] = writeableThreads[writeableEnd];
 								}
+
+								writeableThreadCount = writeableEnd;
+							}
+							break;
+							case writeThread->tasksAwaitingExecution.CAPACITY:
+								// Now has data, previously didn't. Wake up.
+								break;
 							}
 
-
+							++tasksAdded;
 						}
+					}
+
+					// No new waiting tasks, end
+					if (tasksAdded == prevTasksAdded)
+					{
+						break;
 					}
 				}
 			}
@@ -359,8 +389,7 @@ namespace
 					
 					schedule::DrainStalledTasks(sch);
 					schedule::DrainReactors(sch);
-
-					// do the task spreading
+					schedule::AssignNewTasksToThreads(sch);
 
 					workPumpLock->store(false, std::memory_order_release);
 				}
