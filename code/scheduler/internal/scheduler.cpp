@@ -142,6 +142,13 @@ namespace
 
 	namespace thread
 	{
+		struct Context
+		{
+			scheduler::Scheduler* sch;
+			Thread* thisThread;
+			fiber::Fiber* rootFiber;
+		};
+
 		static void Wake(Thread* thread)
 		{
 			if (!thread->hasData.exchange(true))
@@ -155,12 +162,6 @@ namespace
 	{
 		static constexpr size_t TASK_STACK_SIZE = 4096;
 
-		struct Context
-		{
-			scheduler::Scheduler* sch;
-			TaskThread* thisThread;
-			fiber::Fiber* rootFiber;
-		};
 
 		struct TaskContext
 		{
@@ -381,14 +382,15 @@ namespace
 
 		static void FiberMain(void* userData)
 		{
-			Context* const ctx = reinterpret_cast<Context*>(userData);
+			thread::Context* const ctx = reinterpret_cast<thread::Context*>(userData);
 			fiber::FiberAPI api = ctx->sch->fiberAPI;
-			FreeList** freeStacks = &ctx->thisThread->freeStacks;
+			TaskThread* const thisThread = reinterpret_cast<TaskThread*>(ctx->thisThread);
+			FreeList** freeStacks = &thisThread->freeStacks;
 			std::atomic_bool* const running = &ctx->sch->running;
 			std::atomic_bool* const workPumpLock = &ctx->sch->workPumpLock;
-			std::atomic_bool* const workAvailable = &ctx->thisThread->hasData;
-			spsc::fifo_queue<fiber::Fiber*>* const activeFibers = &ctx->thisThread->runningTasks;
-			spsc::ring_buffer<Task, THREAD_WAIT_QUEUE_SIZE_LG2>* const waitingTasks = &ctx->thisThread->tasksAwaitingExecution;
+			std::atomic_bool* const workAvailable = &thisThread->hasData;
+			spsc::fifo_queue<fiber::Fiber*>* const activeFibers = &thisThread->runningTasks;
+			spsc::ring_buffer<Task, THREAD_WAIT_QUEUE_SIZE_LG2>* const waitingTasks = &thisThread->tasksAwaitingExecution;
 
 			for(;;)
 			{
@@ -427,7 +429,7 @@ namespace
 		{
 			static constexpr unsigned taskThreadStackSize = 1024; // Most likely overkill;
 			uint8_t* const taskThreadStack = new uint8_t[taskThreadStackSize];
-			Context ctx{ sch, sch->taskThreads + threadIndex };
+			thread::Context ctx{ sch, sch->taskThreads + threadIndex };
 
 			sanity(threadIndex < sch->taskThreadCount);
 
@@ -439,16 +441,15 @@ namespace
 
 	namespace reactor_thread
 	{
-		struct Context
-		{
-			scheduler::Scheduler* sch;
-			ReactorThread* thisThread;
-			fiber::Fiber* rootFiber;
-		};
-
 		static void FiberMain(void* userData)
 		{
-			Context* const ctx = reinterpret_cast<Context*>(userData);
+			thread::Context* const ctx = reinterpret_cast<thread::Context*>(userData);
+			fiber::FiberAPI api = ctx->sch->fiberAPI;
+			ReactorThread* const thisThread = reinterpret_cast<ReactorThread*>(ctx->thisThread);
+			std::atomic_bool* const running = &ctx->sch->running;
+			std::atomic_bool* const workAvailable = &thisThread->hasData;
+			spsc::fifo_queue<ScheduledFiber>* const activeFibers = &thisThread->runningTasks;
+			
 
 		}
 
@@ -457,7 +458,7 @@ namespace
 			static constexpr unsigned reactorThreadStackSize = 1024; // Most likely overkill;
 			const unsigned threadIndex = threadId - sch->taskThreadCount;
 			uint8_t* const reactorThreadStack = new uint8_t[reactorThreadStackSize];
-			Context ctx{ sch, sch->reactorThreads + threadIndex };
+			thread::Context ctx{ sch, sch->reactorThreads + threadIndex };
 
 			sanity(threadId > sch->taskThreadCount);
 			sanity(threadIndex < sch->reactorThreadCount);
