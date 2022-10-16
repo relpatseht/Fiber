@@ -254,19 +254,27 @@ namespace
 					{
 						sanity(fiber.has_value());
 						const unsigned destIndex = fiber->threadId;
+						Thread* destThread;
 
 						if (destIndex < taskThreadCount)
 						{
 							sanity(destIndex == threadIndex);
+
+							destThread = thread;
 							spsc::queue::push(&thread->runningTasks, fiber->fiber);
 						}
 						else
 						{
 							const unsigned reactorIndex = destIndex - taskThreadCount;
+							ReactorThread* const reactor = sch->reactorThreads + reactorIndex;
 
 							sanity(reactorIndex < sch->reactorThreadCount);
-							spsc::queue::push(&sch->reactorThreads[reactorIndex].runningTasks, ScheduledFiber{ fiber->fiber, thread->id });
+
+							destThread = reactor;
+							spsc::queue::push(&reactor->runningTasks, ScheduledFiber{ fiber->fiber, thread->id });
 						}
+
+						thread::Wake(destThread);
 					}
 				}
 			}
@@ -284,9 +292,11 @@ namespace
 					{
 						sanity(fiber.has_value());
 						const unsigned destIndex = fiber->threadId;
+						TaskThread* const destThread = sch->taskThreads + destIndex;
 
 						sanity(destIndex < taskThreadCount);
-						spsc::queue::push(&sch->taskThreads[destIndex].runningTasks, fiber->fiber);
+						spsc::queue::push(&destThread->runningTasks, fiber->fiber);
+						thread::Wake(destThread);
 					}
 				}
 			}
@@ -370,7 +380,6 @@ namespace
 							case writeThread->tasksAwaitingExecution.CAPACITY:
 								// Now has data, previously didn't. Wake up.
 								thread::Wake(writeThread);
-							[[fallthrough]]
 							default:
 								++writeIndex;
 							}
