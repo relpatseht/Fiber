@@ -404,7 +404,6 @@ namespace
 			FreeList** freeStacks = &thisThread->freeStacks;
 			std::atomic_bool* const running = &ctx->sch->running;
 			std::atomic_bool* const workPumpLock = &ctx->sch->workPumpLock;
-			std::atomic_bool* const workAvailable = &thisThread->hasData;
 			spsc::fifo_queue<fiber::Fiber*>* const activeFibers = &thisThread->runningTasks;
 			spsc::ring_buffer<Task, THREAD_WAIT_QUEUE_SIZE_LG2>* const waitingTasks = &thisThread->tasksAwaitingExecution;
 
