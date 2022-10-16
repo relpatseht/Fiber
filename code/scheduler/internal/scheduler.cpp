@@ -156,6 +156,14 @@ namespace
 				WakeByAddressSingle(&thread->hasData);
 			}
 		}
+
+		static void Sleep(Thread* thread)
+		{
+			bool trueVal = true;
+
+			thread->hasData.store(false, std::memory_order_release);
+			WaitOnAddress(&thread->hasData, &trueVal, sizeof(trueVal), INFINITE);
+		}
 	}
 
 	namespace task_thread
@@ -416,10 +424,7 @@ namespace
 					}
 					else
 					{
-						bool trueVal = true;
-
-						workAvailable->store(false, std::memory_order_release);
-						WaitOnAddress(workAvailable, &trueVal, sizeof(trueVal), INFINITE);
+						thread::Sleep(thisThread);
 					}
 				}
 			}
@@ -447,10 +452,25 @@ namespace
 			fiber::FiberAPI api = ctx->sch->fiberAPI;
 			ReactorThread* const thisThread = reinterpret_cast<ReactorThread*>(ctx->thisThread);
 			std::atomic_bool* const running = &ctx->sch->running;
-			std::atomic_bool* const workAvailable = &thisThread->hasData;
 			spsc::fifo_queue<ScheduledFiber>* const activeFibers = &thisThread->runningTasks;
 			
+			for (;;)
+			{
 
+
+
+				if (spsc::queue::is_empty(*activeFibers))
+				{
+					if (!running->load(std::memory_order_acquire))
+					{
+						break;
+					}
+					else
+					{
+						thread::Sleep(thisThread);
+					}
+				}
+			}
 		}
 
 		static void ThreadMain(scheduler::Scheduler* sch, unsigned threadId)
