@@ -182,6 +182,14 @@ namespace
 			api.Switch(taskFiber, taskCtx->rootFiber);
 		}
 
+		static void WakeThread(TaskThread* thread)
+		{
+			if (!thread->hasData.exchange(true))
+			{
+				WakeByAddressSingle(&thread->hasData);
+			}
+		}
+
 		namespace run
 		{
 			static void DrainExecuteActive(const fiber::FiberAPI& api, fiber::Fiber *rootFiber, spsc::fifo_queue<fiber::Fiber*>* activeFibers, fiber::Fiber** curFiber)
@@ -349,11 +357,8 @@ namespace
 							}
 							break;
 							case writeThread->tasksAwaitingExecution.CAPACITY:
-								if (!writeThread->hasData.exchange(true))
-								{
-									// Now has data, previously didn't. Wake up.
-									WakeByAddressSingle(&writeThread->hasData);
-								}
+								// Now has data, previously didn't. Wake up.
+								WakeThread(writeThread);
 							[[fallthrough]]
 							default:
 								++writeIndex;
