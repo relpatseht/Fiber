@@ -17,7 +17,6 @@
 #include "fiber.h"
 
 #include <thread>
-#include <unordered_map>
 #include <type_traits>
 #include <atomic>
 #include <optional>
@@ -567,15 +566,16 @@ namespace scheduler
 			thread->id = threadIndex;
 
 			{
-				const std::wstring threadName = L"Task Thread ";
+				static const wchar_t baseTaskThreadName[] = L"Task Thread ";
 				std::thread::native_handle_type threadHandle = thread->thread.native_handle();
-				wchar_t threadIdBuf[8];
+				wchar_t threadName[32];
 
 				// Pin and name task threads
-				_itow_s(threadIndex, threadIdBuf, 10);
+				wcscpy(threadName, baseTaskThreadName);
+				_itow(threadIndex, threadName + ARRAYSIZE(baseTaskThreadName), 10);
 				SetThreadIdealProcessor(threadHandle, threadIndex / 64);
 				SetThreadAffinityMask(threadHandle, 1ull << (threadIndex & 63));
-				SetThreadDescription(threadHandle, (threadName + threadIdBuf).c_str());
+				SetThreadDescription(threadHandle, threadName);
 			}
 		}
 
