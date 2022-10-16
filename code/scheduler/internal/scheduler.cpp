@@ -66,10 +66,18 @@ namespace
 		FreeList* next;
 	};
 
-	struct TaskThread
+	struct Thread
 	{
 		std::thread thread{};
 
+
+		unsigned id;
+		std::atomic_bool hasData = false;
+		uint8_t _padding[3];
+	};
+
+	struct TaskThread : public Thread
+	{
 		FreeList* freeStacks = nullptr;
 
 		// These are tasks that have been assigned to run on this
@@ -91,16 +99,10 @@ namespace
 		// rescheduled for execution on the appropriate reactor thread
 		// in the case of a wait, or this thread in case of a yield
 		spsc::fifo_queue<ScheduledFiber> stalledTasks{};
-
-		unsigned id;
-		unsigned char _padding[3];
-		std::atomic_bool hasData = false;
 	};
 
-	struct ReactorThread
+	struct ReactorThread : public Thread
 	{
-		std::thread thread{};
-
 		// This is the list of tasks scheduled to run on this thread
 		spsc::fifo_queue<ScheduledFiber> runningTasks{};
 
@@ -136,6 +138,17 @@ namespace
 	constexpr bool operator!(scheduler::Options a)
 	{
 		return a != scheduler::Options::NONE;
+	}
+
+	namespace thread
+	{
+		static void Wake(Thread* thread)
+		{
+			if (!thread->hasData.exchange(true))
+			{
+				WakeByAddressSingle(&thread->hasData);
+			}
+		}
 	}
 
 	namespace task_thread
@@ -179,14 +192,6 @@ namespace
 			*freeStacks = freeStack;
 
 			api.Switch(taskFiber, taskCtx->rootFiber);
-		}
-
-		static void WakeThread(TaskThread* thread)
-		{
-			if (!thread->hasData.exchange(true))
-			{
-				WakeByAddressSingle(&thread->hasData);
-			}
 		}
 
 		namespace run
@@ -355,7 +360,7 @@ namespace
 							break;
 							case writeThread->tasksAwaitingExecution.CAPACITY:
 								// Now has data, previously didn't. Wake up.
-								WakeThread(writeThread);
+								thread::Wake(writeThread);
 							[[fallthrough]]
 							default:
 								++writeIndex;
@@ -434,14 +439,32 @@ namespace
 
 	namespace reactor_thread
 	{
+		struct Context
+		{
+			scheduler::Scheduler* sch;
+			ReactorThread* thisThread;
+			fiber::Fiber* rootFiber;
+		};
+
+		static void FiberMain(void* userData)
+		{
+			Context* const ctx = reinterpret_cast<Context*>(userData);
+
+		}
 
 		static void ThreadMain(scheduler::Scheduler* sch, unsigned threadId)
 		{
+			static constexpr unsigned reactorThreadStackSize = 1024; // Most likely overkill;
 			const unsigned threadIndex = threadId - sch->taskThreadCount;
+			uint8_t* const reactorThreadStack = new uint8_t[reactorThreadStackSize];
+			Context ctx{ sch, sch->reactorThreads + threadIndex };
 
 			sanity(threadId > sch->taskThreadCount);
 			sanity(threadIndex < sch->reactorThreadCount);
 
+			ctx.rootFiber = sch->fiberAPI.Create(reactorThreadStack, reactorThreadStackSize, FiberMain, &ctx);
+			sch->fiberAPI.Start(ctx.rootFiber);
+			delete[] reactorThreadStack;
 		}
 	}
 }
