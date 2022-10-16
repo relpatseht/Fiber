@@ -423,10 +423,15 @@ namespace
 
 		static void ThreadMain(scheduler::Scheduler* sch, unsigned threadIndex)
 		{
+			static constexpr unsigned taskThreadStackSize = 1024; // Most likely overkill;
+			uint8_t* const taskThreadStack = new uint8_t[taskThreadStackSize];
 			Context ctx{ sch, sch->taskThreads + threadIndex };
 
-			ctx.rootFiber = sch->fiberAPI.Create(new uint8_t[TASK_STACK_SIZE], TASK_STACK_SIZE, FiberMain, &ctx);
+			sanity(threadIndex < sch->taskThreadCount);
+
+			ctx.rootFiber = sch->fiberAPI.Create(taskThreadStack, taskThreadStackSize, FiberMain, &ctx);
 			sch->fiberAPI.Start(ctx.rootFiber);
+			delete[]taskThreadStack;
 		}
 	}
 
