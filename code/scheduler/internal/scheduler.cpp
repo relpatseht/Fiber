@@ -450,14 +450,24 @@ namespace
 		{
 			thread::Context* const ctx = reinterpret_cast<thread::Context*>(userData);
 			fiber::FiberAPI api = ctx->sch->fiberAPI;
+			const unsigned taskThreadCount = ctx->sch->taskThreadCount;
 			ReactorThread* const thisThread = reinterpret_cast<ReactorThread*>(ctx->thisThread);
+			fiber::Fiber* const rootFiber = ctx->rootFiber;
 			std::atomic_bool* const running = &ctx->sch->running;
 			spsc::fifo_queue<ScheduledFiber>* const activeFibers = &thisThread->runningTasks;
+			spsc::fifo_queue<ScheduledFiber>* const finishedFibers = &thisThread->finishedTasks;
 			
 			for (;;)
 			{
+				while (std::optional<ScheduledFiber> fiberThreadPair = spsc::queue::try_pop(activeFibers))
+				{
+					sanity(fiberThreadPair.has_value());
 
+					sanity(fiberThreadPair->threadId < taskThreadCount);
 
+					api.Switch(rootFiber, fiberThreadPair->fiber);
+					spsc::queue::push(finishedFibers, std::move(fiberThreadPair.value()));
+				}
 
 				if (spsc::queue::is_empty(*activeFibers))
 				{
