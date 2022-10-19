@@ -19,6 +19,7 @@ namespace scheduler
 					return reinterpret_cast<FuncT*>(const_cast<void*>(uesrData))();
 				}
 			};
+			static_assert(std::is_trivially_copyable_v<T>);
 
 			return Create(&Delegate::Run, &Task, sizeof(Task), alignof(FuncT));
 		}
@@ -33,7 +34,6 @@ namespace scheduler
 					return reinterpret_cast<FuncT*>(const_cast<void*>(uesrData))();
 				}
 			};
-
 			return Create_Stack(&Delegate::Run, &Task);
 		}
 

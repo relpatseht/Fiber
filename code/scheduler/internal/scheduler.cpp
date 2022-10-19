@@ -190,7 +190,7 @@ namespace
 			taskCtx->task.TaskFunc(taskUserData);
 			if (taskCtx->task.ownedPtr)
 			{
-				delete[] taskUserData;
+				_aligned_free(taskUserData);
 			}
 
 			uint8_t* const taskStack = reinterpret_cast<uint8_t*>(taskFiber) - (TASK_STACK_SIZE - sizeof(fiber::Fiber*));
@@ -518,6 +518,40 @@ namespace scheduler
 	namespace task
 	{
 
+		unsigned Create(void (*TaskPtr)(void*), const void* userData, size_t dataSize, size_t alignment)
+		{
+			if (!userData)
+			{
+				return Create_Stack(TaskPtr, userData);
+			}
+			else
+			{
+				void* const dataCpy = _aligned_malloc(dataSize, alignment);
+				Task task;
+				task.TaskFunc = TaskPtr;
+				task.userDataPtr = reinterpret_cast<uintptr_t>(dataCpy);
+				task.ownedPtr = true;
+
+				sanity(task.userDataPtr == reinterpret_cast<uintptr_t>(dataCpy) && "Byte aligned userData?");
+
+				memcpy(dataCpy, userData, dataSize);
+			}
+		}
+
+		unsigned Create_Stack(void (*TaskPtr)(void*), const void* userData)
+		{
+			Task task;
+			task.TaskFunc = TaskPtr;
+			task.userDataPtr = reinterpret_cast<uintptr_t>(userData);
+			task.ownedPtr = false;
+
+			sanity(task.userDataPtr == reinterpret_cast<uintptr_t>(userData) && "Byte aligned userData?");
+		}
+
+
+		void Run(unsigned task, unsigned optThread);
+		void RunAndWait(unsigned task, unsigned optThread);
+		void Wait(unsigned task);
 	}
 
 	Scheduler* Create(Options opts)
