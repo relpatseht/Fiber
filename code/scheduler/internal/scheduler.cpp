@@ -22,6 +22,10 @@
 #include <optional>
 #include <algorithm>
 
+#ifndef GUARD_UNUSED_STACKS
+# define GUARD_UNUSED_STACK IN_USE
+#endif
+
 /* Basic approach is to try to only use SPSC queues, which, with work stealing,
  * is a bit complex. Whenever any task creates a new task, the new task is added
  * to the active task's thread's unassignedTasks queue.
@@ -165,10 +169,91 @@ namespace
 		}
 	}
 
+
+	namespace stack_alloc
+	{
+		static constexpr const size_t PAGE_ALIGN = 4096;
+		static constexpr const size_t PAGE_MASK = PAGE_ALIGN - 1;
+		static constexpr const size_t PAGE_ALLOC_ALIGN = 64 * 1024;
+		static constexpr const size_t PAGE_ALLOC_MASK = PAGE_ALLOC_ALIGN-1;
+
+		static void* CreateAcquire(size_t totalStackSize, size_t initialStackSize, FreeList** freeStackList)
+		{
+			const size_t realTotalStackSize = (totalStackSize + PAGE_ALLOC_MASK) & ~PAGE_ALLOC_MASK;
+			const size_t realInitialStackSize = (initialStackSize + PAGE_MASK) & ~PAGE_MASK;
+			uint8_t* stackMem = reinterpret_cast<uint8_t*>(*freeStackList);
+
+			if (stackMem)
+			{
+				*freeStackList = (*freeStackList)->next;
+			}
+			else
+			{
+				stackMem = (uint8_t*)VirtualAlloc(nullptr, realTotalStackSize, MEM_RESERVE, PAGE_NOACCESS);
+			}
+
+			sanity(stackMem);
+			sanity(initialStackSize <= totalStackSize);
+
+			uint8_t* const readWriteMem = stackMem + (realTotalStackSize - realInitialStackSize);
+
+			sanity((reinterpret_cast<uintptr_t>(readWriteMem) & PAGE_MASK) == 0);
+			VirtualAlloc(readWriteMem, realInitialStackSize, MEM_COMMIT, PAGE_READWRITE);
+
+			if (realInitialStackSize < realTotalStackSize)
+			{
+				uint8_t* const guardPageMem = readWriteMem - PAGE_ALIGN;
+
+				sanity((reinterpret_cast<uintptr_t>(guardPageMem) & PAGE_MASK) == 0);
+				VirtualAlloc(guardPageMem, PAGE_ALIGN, MEM_COMMIT, PAGE_READONLY | PAGE_GUARD);
+			}
+
+			return stackMem;
+		}
+
+		static void Return(void* stack, size_t totalStackSize, FreeList** freeStackList)
+		{
+			FreeList* const freeStack = reinterpret_cast<FreeList*>(stack);
+
+			{ // Make sure we can do freelist operations
+				DWORD oldProtect;
+				VirtualProtect(stack, PAGE_ALIGN, PAGE_READWRITE, &oldProtect);
+			}
+
+			freeStack->next = *freeStackList;
+			*freeStackList = freeStack;
+
+#if USING(GUARD_UNUSED_STACK)
+			{ // Mark as much of the stack as we can as no access.
+				uint8_t* const noaccessStart = reinterpret_cast<uint8_t*>(stack) + PAGE_ALIGN;
+				const size_t realStackSize = (totalStackSize + PAGE_ALLOC_MASK) & ~PAGE_ALLOC_MASK;
+				const size_t noaccessSize = realStackSize - PAGE_ALIGN;
+				DWORD oldProtect;
+
+				sanity((reinterpret_cast<uintptr_t>(noaccessStart) & PAGE_MASK) == 0);
+				VirtualProtect(noaccessStart, noaccessSize, PAGE_NOACCESS, &oldProtect);
+			}
+#else //#if USING(GUARD_UNUSED_STACK)
+			((void)totalStackSize);
+#endif //#else //#if USING(GUARD_UNUSED_STACK)
+		}
+
+		static void ReleaseAll(FreeList* freeList)
+		{
+			while (freeList)
+			{
+				FreeList* const next = freeList->next;
+
+				VirtualFree(freeList, 0, MEM_DECOMMIT | MEM_RELEASE);
+				freeList = next;
+			}
+		}
+	}
+
 	namespace task_thread
 	{
-		static constexpr size_t TASK_STACK_SIZE = 4096;
-
+		static constexpr size_t TASK_TOTAL_STACK_SIZE = 1*1024*1024;
+		static constexpr size_t TASK_INITIAL_STACK_SIZE = 4096;
 
 		struct TaskContext
 		{
@@ -193,11 +278,9 @@ namespace
 				_aligned_free(taskUserData);
 			}
 
-			uint8_t* const taskStack = reinterpret_cast<uint8_t*>(taskFiber) - (TASK_STACK_SIZE - sizeof(fiber::Fiber*));
-			FreeList* const freeStack = reinterpret_cast<FreeList*>(taskStack);
+			uint8_t* const taskStack = reinterpret_cast<uint8_t*>(taskFiber) - (TASK_TOTAL_STACK_SIZE - sizeof(fiber::Fiber*));
 
-			freeStack->next = *freeStacks;
-			*freeStacks = freeStack;
+			stack_alloc::Return(taskStack, TASK_TOTAL_STACK_SIZE, freeStacks);
 
 			api.Switch(taskFiber, taskCtx->rootFiber);
 		}
@@ -221,18 +304,9 @@ namespace
 					sanity(nextTask.has_value());
 
 					TaskContext taskCtx{ nullptr, rootFiber, freeStacks, &api, nextTask.value() };
-					void* stackMem = *freeStacks;
+					void* const stackMem = stack_alloc::CreateAcquire(TASK_TOTAL_STACK_SIZE, TASK_INITIAL_STACK_SIZE, freeStacks);
 
-					if (stackMem)
-					{
-						*freeStacks = (*freeStacks)->next;
-					}
-					else
-					{
-						stackMem = new uint8_t[TASK_STACK_SIZE];
-					}
-
-					fiber::Fiber* const newFiber = api.Create(stackMem, TASK_STACK_SIZE, &FiberTask, &taskCtx);
+					fiber::Fiber* const newFiber = api.Create(stackMem, TASK_TOTAL_STACK_SIZE, TASK_INITIAL_STACK_SIZE, &FiberTask, &taskCtx);
 					taskCtx.taskFiber = newFiber;
 					api.Switch(rootFiber, newFiber);
 				}
@@ -445,8 +519,10 @@ namespace
 
 			sanity(threadIndex < sch->taskThreadCount);
 
-			ctx.rootFiber = sch->fiberAPI.Create(taskThreadStack, taskThreadStackSize, FiberMain, &ctx);
+			ctx.rootFiber = sch->fiberAPI.Create(taskThreadStack, taskThreadStackSize, 0, FiberMain, &ctx);
 			sch->fiberAPI.Start(ctx.rootFiber);
+
+			stack_alloc::ReleaseAll(reinterpret_cast<TaskThread*>(ctx.thisThread)->freeStacks);
 			delete[]taskThreadStack;
 		}
 	}
@@ -500,7 +576,7 @@ namespace
 			sanity(threadId > sch->taskThreadCount);
 			sanity(threadIndex < sch->reactorThreadCount);
 
-			ctx.rootFiber = sch->fiberAPI.Create(reactorThreadStack, reactorThreadStackSize, FiberMain, &ctx);
+			ctx.rootFiber = sch->fiberAPI.Create(reactorThreadStack, reactorThreadStackSize, 0, FiberMain, &ctx);
 			sch->fiberAPI.Start(ctx.rootFiber);
 			delete[] reactorThreadStack;
 		}
