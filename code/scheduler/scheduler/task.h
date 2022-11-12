@@ -5,14 +5,26 @@
 namespace scheduler
 {
 	struct Scheduler;
+	struct TaskHandle
+	{
+		TaskHandle();
+		TaskHandle(const TaskHandle& rhs);
+		TaskHandle(TaskHandle&& rhs);
+		TaskHandle& operator=(const TaskHandle& rhs);
+		TaskHandle& operator=(TaskHandle&& rhs);
+		~TaskHandle();
+
+	private:
+		void* data;
+	};
 
 	namespace task
 	{
-		unsigned Create(void (*Task)(void*), const void* userData, size_t dataSize, size_t alignment = 0);
-		unsigned Create_Stack(void (*Task)(void*), const void* userData); // Task had better finish before userData goes out of scope
+		TaskHandle Create(void (*Task)(void*), const void* userData, size_t dataSize, size_t alignment = 0);
+		TaskHandle Create_Stack(void (*Task)(void*), const void* userData); // Task had better finish before userData goes out of scope
 
 		template<typename FuncT>
-		unsigned Create(FuncT Task, Scheduler* optSCH)
+		TaskHandle Create(FuncT Task, Scheduler* optSCH)
 		{
 			struct Delegate
 			{
@@ -27,7 +39,7 @@ namespace scheduler
 		}
 
 		template<typename FuncT>
-		unsigned Create_Stack(FuncT Task)
+		TaskHandle Create_Stack(FuncT Task)
 		{
 			struct Delegate
 			{
@@ -39,8 +51,8 @@ namespace scheduler
 			return Create_Stack(&Delegate::Run, &Task);
 		}
 
-		void Run(unsigned task, unsigned optThread = ~0u);
-		void RunAndWait(unsigned task, unsigned optThread = ~0u);
-		void Wait(unsigned task);
+		void Run(TaskHandle task, unsigned optThread = ~0u);
+		void RunAndWait(TaskHandle task, unsigned optThread = ~0u);
+		void Wait(TaskHandle task);
 	}
 }

@@ -47,6 +47,12 @@ namespace
 {
 	static constexpr unsigned THREAD_WAIT_QUEUE_SIZE_LG2 = 3;
 
+	union TaskRef
+	{
+		uintptr_t users;
+		TaskRef* next;
+	};
+
 	struct Task
 	{
 		void (*TaskFunc)(void*);
@@ -581,6 +587,25 @@ namespace
 			delete[] reactorThreadStack;
 		}
 	}
+
+	namespace task_ref
+	{
+		static void DecRef(TaskRef* t)
+		{
+			if (t)
+			{
+				--t->users;
+			}
+		}
+
+		static void IncRef(TaskRef* t)
+		{
+			if (t)
+			{
+				++t->users;
+			}
+		}
+	}
 }
 
 namespace scheduler
@@ -594,7 +619,7 @@ namespace scheduler
 	namespace task
 	{
 
-		unsigned Create(void (*TaskPtr)(void*), const void* userData, size_t dataSize, size_t alignment)
+		TaskHandle Create(void (*TaskPtr)(void*), const void* userData, size_t dataSize, size_t alignment)
 		{
 			if (!userData)
 			{
@@ -614,7 +639,7 @@ namespace scheduler
 			}
 		}
 
-		unsigned Create_Stack(void (*TaskPtr)(void*), const void* userData)
+		TaskHandle Create_Stack(void (*TaskPtr)(void*), const void* userData)
 		{
 			Task task;
 			task.TaskFunc = TaskPtr;
@@ -625,9 +650,41 @@ namespace scheduler
 		}
 
 
-		void Run(unsigned task, unsigned optThread);
-		void RunAndWait(unsigned task, unsigned optThread);
-		void Wait(unsigned task);
+		void Run(TaskHandle task, unsigned optThread);
+		void RunAndWait(TaskHandle task, unsigned optThread);
+		void Wait(TaskHandle task);
+	}
+
+	TaskHandle::TaskHandle() : data(nullptr) {}
+
+	TaskHandle::TaskHandle(const TaskHandle& rhs) : data(rhs.data)
+	{
+		task_ref::IncRef(reinterpret_cast<TaskRef*>(data));
+	}
+
+	TaskHandle::TaskHandle(TaskHandle&& rhs) : data(rhs.data)
+	{
+		rhs.data = nullptr;
+	}
+
+	TaskHandle& TaskHandle::operator=(const TaskHandle& rhs)
+	{
+		task_ref::DecRef(reinterpret_cast<TaskRef*>(data));
+		data = rhs.data;
+		task_ref::IncRef(reinterpret_cast<TaskRef*>(data));
+		return *this;
+	}
+
+	TaskHandle& TaskHandle::operator=(TaskHandle&& rhs)
+	{
+		data = rhs.data;
+		rhs.data = nullptr;
+		return *this;
+	}
+
+	TaskHandle::~TaskHandle()
+	{
+		task_ref::DecRef(reinterpret_cast<TaskRef*>(data));
 	}
 
 	Scheduler* Create(Options opts)
