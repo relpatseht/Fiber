@@ -180,7 +180,7 @@ public:
 	static inline StartASMProc* const StartASM = reinterpret_cast<StartASMProc*>(ASMBlob.data() + StartFiberASM_Offset);
 	static inline SwitchASMProc* const SwitchFiberASM = reinterpret_cast<SwitchASMProc*>(ASMBlob.data() + SwitchToFiberASM_Offset);
 
-	static uintptr_t* InitStackRegisters(uintptr_t* const spBase, void(*StartAddress)(void*), void* userData, size_t stackSize)
+	static uintptr_t* InitStackRegisters(uintptr_t* const spBase, void(*StartAddress)(void*), void* userData, size_t stackSize, size_t committedStackSize)
 	{
 		uintptr_t* sp = spBase;
 
@@ -197,15 +197,17 @@ public:
 #endif //#if USING(SAVE_TIB_SEH)
 #if USING(SAVE_TIB_STACK)
 		const uintptr_t stackBase = reinterpret_cast<uintptr_t>(spBase);
-		const uintptr_t stackCeil = stackBase - stackSize;
+		const uintptr_t stackCeil = stackBase - committedStackSize;
+		const uintptr_t trueStackCeil = stackBase - stackSize;
 
 		// pie
 		*--sp = stackBase; // gs:0x8, stack base (high address)
 		*--sp = stackCeil; // gs:0x10, stack ceiling (low address)
-		*--sp = stackCeil; // gs:0x1478, true stack base. Can be used to add guard pages and stack reallocations
+		*--sp = trueStackCeil; // gs:0x1478, true stack ceil. Can be used to add guard pages and stack reallocations
 		*--sp = stackSize; // gs:0x1748, true stack size. Can be used by windows functions when reallocating stack with gs:1478
 #else //#if USING(SAVE_TIB_STACK)
 		((void)stackSize);
+		((void)committedStackSize);
 #endif //#else //#if USING(SAVE_TIB_STACK)
 
 		sp -= CPU_REG_COUNT;

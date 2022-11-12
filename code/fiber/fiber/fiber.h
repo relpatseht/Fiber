@@ -47,7 +47,16 @@ namespace fiber
 
 	struct FiberAPI
 	{
-		Fiber* (*Create)(void* stack, size_t stackSize, FiberFunc StartAddress, void* userData);
+		/* Creates a new fiber with the given stack running the given function
+		*  stack - pointer to the stack memory block. The end of the stack memory.
+		*  stackSize - Total size of the stack memory block, in bytes
+		*  commitedStackSize - Size of the currently allocated pages of the stack in bytes. 
+		*                      Should be page size aligned if used. If 0, assumed the same as stackSize.
+		*                      If less than stackSize, the next page must be a guard page.
+		*  StartAddress - Start function for the stack
+		*  userData - Data passed to StartAddress
+		*/
+		Fiber* (*Create)(void* stack, size_t stackSize, size_t commitedStackSize, FiberFunc StartAddress, void* userData);
 		void (*Start)(Fiber* toFiber);
 		void (*Switch)(Fiber* curFiber, Fiber* toFiber);
 	};

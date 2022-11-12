@@ -74,7 +74,7 @@ int main()
 		data[fiberIndex].fibers = fibers;
 		data[fiberIndex].value = fiberIndex + 1;
 
-		fibers[fiberIndex] = s_fiberAPI.Create(stackBase[fiberIndex], stackSize, fiberFuncs[fiberIndex], &data[fiberIndex]);
+		fibers[fiberIndex] = s_fiberAPI.Create(stackBase[fiberIndex], stackSize, 0, fiberFuncs[fiberIndex], &data[fiberIndex]);
 	}
 	
 	s_fiberAPI.Start(fibers[0]);

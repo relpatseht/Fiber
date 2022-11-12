@@ -106,23 +106,38 @@ namespace
 	template<fiber::Options Opts>
 	struct FiberAPIImpl
 	{
-		static fiber::Fiber* Create(void* stack, size_t stackSize, fiber::FiberFunc startAddress, void* userData)
+		static fiber::Fiber* Create(void* stack, size_t stackSize, size_t commitedStackSize, fiber::FiberFunc startAddress, void* userData)
 		{
 			static constexpr unsigned STACK_ALIGN_MASK = STACK_ALIGN - 1;
+
+			if constexpr (!(Opts & fiber::Options::OS_API_SAFETY))
+			{
+				if (!commitedStackSize)
+				{
+					commitedStackSize = stackSize;
+				}
+				else
+				{
+					sanity(stackSize == commitedStackSize);
+				}
+			}
+
+			static_assert(sizeof(fiber::Fiber) <= STACK_ALIGN);
+
 			const uintptr_t stackAddr = reinterpret_cast<uintptr_t>(stack);
 			const uintptr_t alignedStackAddr = (stackAddr + STACK_ALIGN_MASK) & ~STACK_ALIGN_MASK;
-			const size_t alignedStackMemSize = stackSize - (alignedStackAddr - stackAddr);
+			const size_t alignedStackMemSize = commitedStackSize - (alignedStackAddr - stackAddr);
 			uintptr_t* const stackCeil = reinterpret_cast<uintptr_t*>(alignedStackAddr);
 			const size_t stackMemEntries = alignedStackMemSize / sizeof(uintptr_t);
 			const size_t stackEntries = stackMemEntries - (STACK_ALIGN/sizeof(uintptr_t));
+			const size_t alignedTrueStackSize = stackSize & ~(sizeof(uintptr_t) - 1);
 			uintptr_t* const stackBase = stackCeil + stackEntries;
 			fiber::Fiber* out = reinterpret_cast<fiber::Fiber*>(stackCeil + stackMemEntries - sizeof(fiber::Fiber)/sizeof(uintptr_t));
 
-			static_assert(sizeof(fiber::Fiber) <= STACK_ALIGN);
 			sanity(stackBase == ToStackHead(out));
 			sanity(stackSize);
 
-			out->sp = FiberASMAPI<Opts>::InitStackRegisters(stackBase, startAddress, userData, stackEntries*sizeof(uintptr_t));
+			out->sp = FiberASMAPI<Opts>::InitStackRegisters(stackBase, startAddress, userData, alignedTrueStackSize, stackEntries*sizeof(uintptr_t));
 
 			sanity(out->sp >= stackCeil && "Not enough stack space to hold base context");
 
