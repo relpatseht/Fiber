@@ -56,6 +56,7 @@ namespace
 	struct Task
 	{
 		void (*TaskFunc)(void*);
+		TaskRef* taskRef;
 		struct
 		{
 			uintptr_t userDataPtr : sizeof(uintptr_t) * 8 - 1;
@@ -75,10 +76,20 @@ namespace
 		FreeList* next;
 	};
 
+	struct TaskAlloc
+	{
+		static constexpr const unsigned PAGE_SIZE = 8 * 1024;
+		static constexpr const unsigned PAGE_MASK = PAGE_SIZE - 1;
+		FreeList* unusedTasks;
+		TaskRef* taskMem;
+		unsigned size;
+		uint16_t totalPageCapacity;
+		uint16_t curPageCapacity;
+	};
+
 	struct Thread
 	{
 		std::thread thread{};
-
 
 		unsigned id;
 		std::atomic_bool hasData = false;
@@ -119,6 +130,7 @@ namespace
 		// wait and now need to be returned to their parent thread
 		spsc::fifo_queue<ScheduledFiber> finishedTasks{};
 	};
+
 }
 
 namespace scheduler
@@ -174,7 +186,6 @@ namespace
 			WaitOnAddress(&thread->hasData, &trueVal, sizeof(trueVal), INFINITE);
 		}
 	}
-
 
 	namespace stack_alloc
 	{
