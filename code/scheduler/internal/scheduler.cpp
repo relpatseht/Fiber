@@ -629,7 +629,6 @@ namespace scheduler
 
 	namespace task
 	{
-
 		TaskHandle Create(void (*TaskPtr)(void*), const void* userData, size_t dataSize, size_t alignment)
 		{
 			if (!userData)

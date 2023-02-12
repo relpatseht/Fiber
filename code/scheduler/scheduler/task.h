@@ -24,31 +24,23 @@ namespace scheduler
 		TaskHandle Create_Stack(void (*Task)(void*), const void* userData); // Task had better finish before userData goes out of scope
 
 		template<typename FuncT>
-		TaskHandle Create(FuncT Task, Scheduler* optSCH)
+		TaskHandle Create(FuncT Task)
 		{
-			struct Delegate
-			{
-				static void Run(const void* userData)
-				{
-					return reinterpret_cast<FuncT*>(const_cast<void*>(uesrData))();
-				}
-			};
 			static_assert(std::is_trivially_copyable_v<FuncT>);
 
-			return Create(&Delegate::Run, &Task, sizeof(Task), alignof(FuncT));
+			return Create([](const void* userData)
+			{
+				reinterpret_cast<FuncT*>(const_cast<void*>(uesrData))();
+			}, &Task, sizeof(Task), alignof(FuncT));
 		}
 
 		template<typename FuncT>
 		TaskHandle Create_Stack(FuncT Task)
 		{
-			struct Delegate
+			return Create_Stack([](const void* userData)
 			{
-				static void Run(const void* userData)
-				{
-					return reinterpret_cast<FuncT*>(const_cast<void*>(uesrData))();
-				}
-			};
-			return Create_Stack(&Delegate::Run, &Task);
+				reinterpret_cast<FuncT*>(const_cast<void*>(uesrData))();
+			}, &Task);
 		}
 
 		void Run(TaskHandle task, unsigned optThread = ~0u);
